@@ -16,17 +16,19 @@ import { useApp } from '../../context/AppContext';
 export const EODAuditModal: React.FC = () => {
   const { modalData, closeModal, closeShiftAndAudit, shiftDrawer, rates, language, t } = useApp();
 
-  const [qarCount, setQarCount] = useState<number>(shiftDrawer.currentCashDrawer.QAR);
-  const [usdCount, setUsdCount] = useState<number>(shiftDrawer.currentCashDrawer.USD);
-  const [eurCount, setEurCount] = useState<number>(shiftDrawer.currentCashDrawer.EUR);
-  const [gbpCount, setGbpCount] = useState<number>(shiftDrawer.currentCashDrawer.GBP);
+  const currentDrawer = modalData || shiftDrawer;
+
+  const [qarCount, setQarCount] = useState<number>(currentDrawer.currentCashDrawer.QAR);
+  const [usdCount, setUsdCount] = useState<number>(currentDrawer.currentCashDrawer.USD);
+  const [eurCount, setEurCount] = useState<number>(currentDrawer.currentCashDrawer.EUR);
+  const [gbpCount, setGbpCount] = useState<number>(currentDrawer.currentCashDrawer.GBP);
   const [supervisorNotes, setSupervisorNotes] = useState('All passenger vouchers verified. NAPS POS batch settled.');
   const [isFinalized, setIsFinalized] = useState(false);
 
-  const diffQAR = qarCount - shiftDrawer.systemExpected.QAR;
-  const diffUSD = usdCount - shiftDrawer.systemExpected.USD;
-  const diffEUR = eurCount - shiftDrawer.systemExpected.EUR;
-  const diffGBP = gbpCount - shiftDrawer.systemExpected.GBP;
+  const diffQAR = qarCount - currentDrawer.systemExpected.QAR;
+  const diffUSD = usdCount - currentDrawer.systemExpected.USD;
+  const diffEUR = eurCount - currentDrawer.systemExpected.EUR;
+  const diffGBP = gbpCount - currentDrawer.systemExpected.GBP;
 
   const totalDiscrepancyQAR =
     diffQAR +
@@ -47,6 +49,11 @@ export const EODAuditModal: React.FC = () => {
       },
       supervisorNotes
     );
+    if (modalData && typeof modalData.onAudited === 'function') {
+      try {
+        modalData.onAudited();
+      } catch {}
+    }
     setIsFinalized(true);
     setTimeout(() => {
       closeModal();
@@ -57,7 +64,7 @@ export const EODAuditModal: React.FC = () => {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs select-none">
       <div className="relative w-full max-w-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-850">
+        <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-800">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs">
               <Scale className="w-4 h-4" />
@@ -67,7 +74,7 @@ export const EODAuditModal: React.FC = () => {
                 {language === 'ar' ? 'مطابقة وإغلاق الوردية (Z-Report Audit)' : 'EOD Shift Audit & Reconciliation (Z-Report)'}
               </h3>
               <p className="text-[11px] text-slate-500 font-mono">
-                {shiftDrawer.counterName} · Shift ID #HIA-S2-884
+                {currentDrawer.counterName} · Shift ID {currentDrawer.shiftId || '#HIA-S2-884'}
               </p>
             </div>
           </div>
@@ -88,7 +95,7 @@ export const EODAuditModal: React.FC = () => {
               Shift Successfully Audited & Locked
             </h4>
             <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
-              Z-Report #Z-20261007-884 generated. Bank drop voucher transmitted to Qatar National Bank (QNB) airport vault.
+              Z-Report #{currentDrawer.shiftId ? `Z-${currentDrawer.shiftId.replace(/#/g, '')}` : 'Z-20261013-884'} generated. Bank drop voucher transmitted to Qatar National Bank (QNB) vault.
             </p>
           </div>
         ) : (
@@ -98,20 +105,20 @@ export const EODAuditModal: React.FC = () => {
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/70 dark:border-slate-800">
                 <span className="text-[10px] uppercase font-bold text-slate-400">DUTY CASHIER</span>
                 <div className="font-semibold text-slate-900 dark:text-white text-xs mt-0.5">
-                  {shiftDrawer.agentName}
+                  {currentDrawer.agentName}
                 </div>
                 <div className="text-[10px] text-slate-500 font-mono mt-0.5">
-                  Shift: 06:00 AM – 14:30 PM
+                  Shift: 06:00 AM – 14:30 PM (or Active Roster)
                 </div>
               </div>
 
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/70 dark:border-slate-800">
                 <span className="text-[10px] uppercase font-bold text-slate-400">TOTAL TRANSACTIONS</span>
                 <div className="font-semibold text-slate-900 dark:text-white text-xs mt-0.5 font-mono">
-                  {shiftDrawer.transactionsCount} Bookings Settled
+                  {currentDrawer.transactionsCount} Bookings Settled
                 </div>
                 <div className="text-[10px] text-slate-500 font-mono mt-0.5">
-                  POS Slips: QAR {shiftDrawer.posCardTotalQAR.toLocaleString()}
+                  POS Slips: QAR {currentDrawer.posCardTotalQAR.toLocaleString()}
                 </div>
               </div>
             </div>
@@ -129,7 +136,7 @@ export const EODAuditModal: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <label className="font-bold text-slate-800 dark:text-slate-200">QAR (ر.ق)</label>
                     <span className="text-[10px] font-mono text-slate-400">
-                      Sys: {shiftDrawer.systemExpected.QAR}
+                      Sys: {currentDrawer.systemExpected.QAR}
                     </span>
                   </div>
                   <input
@@ -148,7 +155,7 @@ export const EODAuditModal: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <label className="font-bold text-slate-800 dark:text-slate-200">USD ($)</label>
                     <span className="text-[10px] font-mono text-slate-400">
-                      Sys: ${shiftDrawer.systemExpected.USD}
+                      Sys: ${currentDrawer.systemExpected.USD}
                     </span>
                   </div>
                   <input
@@ -167,7 +174,7 @@ export const EODAuditModal: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <label className="font-bold text-slate-800 dark:text-slate-200">EUR (€)</label>
                     <span className="text-[10px] font-mono text-slate-400">
-                      Sys: €{shiftDrawer.systemExpected.EUR}
+                      Sys: €{currentDrawer.systemExpected.EUR}
                     </span>
                   </div>
                   <input
@@ -186,7 +193,7 @@ export const EODAuditModal: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <label className="font-bold text-slate-800 dark:text-slate-200">GBP (£)</label>
                     <span className="text-[10px] font-mono text-slate-400">
-                      Sys: £{shiftDrawer.systemExpected.GBP}
+                      Sys: £{currentDrawer.systemExpected.GBP}
                     </span>
                   </div>
                   <input

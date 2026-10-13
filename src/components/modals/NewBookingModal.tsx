@@ -11,6 +11,7 @@ import {
   DollarSign,
   CheckCircle2,
   Calendar,
+  Clock,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Currency } from '../../types';
@@ -39,7 +40,9 @@ export const NewBookingModal: React.FC = () => {
   const [paymentCurrency, setPaymentCurrency] = useState<Currency>(currency);
   const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'POS Card' | 'Payment Link' | 'Prepaid OTA'>('POS Card');
   const [selectedDriverId, setSelectedDriverId] = useState(drivers[0].id);
-  const [notes, setNotes] = useState('Airport Desk Counter 4 walk-in passenger');
+  const [bookingDate, setBookingDate] = useState('2026-10-15');
+  const [bookingTime, setBookingTime] = useState('14:30');
+  const [notes, setNotes] = useState('Agent Desk Counter walk-in passenger');
 
   const selectedPkg = packages.find((p) => p.id === selectedPackageId) || packages[0] || {
     id: 'pkg-fallback',
@@ -84,8 +87,10 @@ export const NewBookingModal: React.FC = () => {
       qrStatus: 'checked-in',
       qrCodeUrl: `https://artrust.qa/voucher/${pnr}`,
       voucherSent: false,
+      bookingDate,
+      bookingTime,
       notes,
-      source: 'Airport Desk',
+      source: 'Agent Desk',
     });
 
     closeModal();
@@ -95,17 +100,17 @@ export const NewBookingModal: React.FC = () => {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs select-none">
       <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">
         {/* Header */}
-        <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/70 dark:bg-slate-850">
+        <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/70 dark:bg-slate-800">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs">
               <Plane className="w-4 h-4" />
             </div>
             <div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                {language === 'ar' ? 'إنشاء حجز كاونتر جديد / استلام المطار' : 'New Airport Desk Reservation & Chauffeur'}
+                {language === 'ar' ? 'إنشاء حجز مكتب وكيل / استلام وفود' : 'New Agent Desk Reservation & Chauffeur'}
               </h3>
               <p className="text-[11px] text-slate-500 font-mono">
-                Counter 4 · Hamad International Airport (DOH)
+                Agent Desk Station · Doha, Qatar
               </p>
             </div>
           </div>
@@ -233,6 +238,36 @@ export const NewBookingModal: React.FC = () => {
                     </button>
                   ))}
                 </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80">
+              <div>
+                <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Tour / Service Booking Date *</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={bookingDate}
+                  onChange={(e) => setBookingDate(e.target.value)}
+                  className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono font-medium focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Scheduled Pickup Time *</span>
+                </label>
+                <input
+                  type="time"
+                  required
+                  value={bookingTime}
+                  onChange={(e) => setBookingTime(e.target.value)}
+                  className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono font-bold focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
+                />
               </div>
             </div>
 

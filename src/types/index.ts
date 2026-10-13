@@ -9,7 +9,8 @@ export type UserRole =
   | 'operations-manager'
   | 'transit-agent'
   | 'driver-guide'
-  | 'finance-accountant';
+  | 'finance-accountant'
+  | 'vendor-partner';
 
 export interface RoleConfig {
   id: UserRole;
@@ -116,9 +117,13 @@ export interface Booking {
   qrStatus: BookingStatus;
   qrCodeUrl: string;
   voucherSent: boolean;
+  bookingDate?: string; // e.g. '2026-10-15' or customer desired booking date
+  bookingTime?: string; // e.g. '14:30' or time customer requested for tour/pickup
   notes?: string;
+  deskId?: string;
+  deskCode?: string;
   createdAt: string;
-  source: 'Airport Desk' | 'Online Web' | 'VIP Concierge' | 'OTA Partner' | 'Web Integration API';
+  source: 'Airport Desk' | 'Agent Desk' | 'Online Web' | 'VIP Concierge' | 'OTA Partner' | 'Web Integration API' | string;
 }
 
 export interface ExchangeRates {
@@ -127,6 +132,7 @@ export interface ExchangeRates {
   GBP: number; // e.g. 4.74 QAR per GBP
   SAR: number; // e.g. 0.99 QAR per SAR
   lastUpdated: string;
+  [key: string]: number | string | undefined;
 }
 
 export interface TourPackage {
@@ -211,7 +217,7 @@ export interface NotificationItem {
   message: string;
   messageAr: string;
   time: string;
-  type: 'flight' | 'driver' | 'cash' | 'vip';
+  type: 'flight' | 'driver' | 'cash' | 'vip' | 'booking' | 'hotel';
   read: boolean;
   actionLabel?: string;
 }
@@ -235,6 +241,9 @@ export interface AirportDesk {
   operatingHours?: string;
   dailyTargetQAR?: number;
   currentDrawerCashQAR?: number;
+  deskType?: 'Airport Counter' | 'Hotel Vendor Desk' | 'Flagship Office';
+  hotelVendorId?: string;
+  hotelName?: string;
 }
 
 export interface DeskAssignmentRecord {
@@ -280,7 +289,7 @@ export interface Employee {
   email: string;
   phone: string;
   role: string;
-  department: 'Airport Desk' | 'Operations' | 'Field Drivers' | 'Tour Guides' | 'Finance';
+  department: 'Airport Desk' | 'Agent Desk' | 'Hotel Partner Desks' | 'Operations' | 'Field Drivers' | 'Tour Guides' | 'Finance';
   assignedAirport: string;
   assignedDeskId: string;
   assignedDeskName: string;
@@ -295,13 +304,23 @@ export interface Employee {
   emergencyContact: string;
 }
 
+export interface GuestTier {
+  id: string;
+  name: string;
+  nameAr?: string;
+  discountPercentage: number; // e.g. 15 for 15% discount
+  badgeColor?: string; // e.g. 'purple', 'amber', 'emerald', 'blue'
+  minSpendQAR?: number;
+  description?: string;
+}
+
 export interface Guest {
   id: string;
   name: string;
   nationality: string;
   phone: string;
   email: string;
-  vipTier: 'VIP Platinum' | 'VIP Gold' | 'VIP Silver' | 'Standard' | 'Transit Special';
+  vipTier: string; // Dynamic tier name matching GuestTier.name
   passportNo?: string;
   totalBookings: number;
   totalSpentQAR: number;
@@ -355,4 +374,118 @@ export interface FinanceExpense {
   approvalNotes?: string;
   notes?: string;
   rejectedReason?: string;
+}
+
+export interface HotelRoomOption {
+  roomType: string;
+  ratePerNightQAR: number;
+  maxPax: number;
+  description: string;
+}
+
+export interface HotelVendorDesk {
+  deskCode: string;
+  deskName: string;
+  locationInHotel: string;
+  assignedStaff: string;
+  phone: string;
+  status: 'Active' | 'Offline';
+}
+
+export interface HotelVendor {
+  id: string;
+  name: string;
+  nameAr?: string;
+  locationZone: string; // e.g. 'West Bay, Doha', 'The Pearl-Qatar', 'Lusail Marina', 'Msheireb Downtown'
+  starRating: 4 | 5;
+  contactPerson: string;
+  contactPhone: string;
+  contactEmail: string;
+  address: string;
+  commissionRate: number; // e.g. 15 for 15%
+  desks: HotelVendorDesk[];
+  roomOptions: HotelRoomOption[];
+  contractStatus: 'Active Partner' | 'Pending Renewal' | 'Exclusive Partner';
+  totalBookings: number;
+  totalRevenueQAR: number;
+  imageUrl?: string;
+  amenities: string[];
+  notes?: string;
+  createdAt: string;
+}
+
+export interface HotelBooking {
+  id: string;
+  confirmationCode: string; // e.g. 'HTL-QA-9042'
+  hotelId: string;
+  hotelName: string;
+  hotelLocation: string;
+  guestName: string;
+  guestPhone: string;
+  guestEmail: string;
+  guestNationality: string;
+  roomType: string;
+  roomsCount: number;
+  paxAdults: number;
+  paxChildren: number;
+  checkInDate: string; // YYYY-MM-DD
+  checkOutDate: string; // YYYY-MM-DD
+  nights: number;
+  mealPlan: 'Room Only' | 'Bed & Breakfast' | 'Half Board' | 'Full Board' | 'All Inclusive';
+  ratePerNightQAR: number;
+  totalQAR: number;
+  commissionRate: number; // percentage
+  commissionEarnedQAR: number;
+  bookingSource: 'Agent Desk (Hotel Lobby)' | 'Airport Desk Counter' | 'Online Web Portal' | 'VIP Concierge Direct';
+  deskCode?: string;
+  agentName?: string;
+  paymentMethod: 'Cash' | 'POS Card' | 'Payment Link Online' | 'Bill to Room';
+  paymentStatus: 'Paid & Verified' | 'Pending Payment' | 'Deposit Paid';
+  bookingStatus: 'Confirmed' | 'Checked In' | 'Completed' | 'Cancelled';
+  specialRequests?: string;
+  voucherSent: boolean;
+  createdAt: string;
+}
+
+export interface CurrencyItem {
+  code: string;
+  name: string;
+  symbol: string;
+  rateToQAR: number; // 1 unit of currency = X QAR
+  isPegged?: boolean;
+  peggedNote?: string;
+  bankAccount: string;
+  cashVaultBalance: number;
+}
+
+export interface CurrencyHistoryRecord {
+  id: string;
+  date: string; // YYYY-MM-DD
+  time?: string; // HH:mm
+  currencyCode: string;
+  currencyName: string;
+  rateToQAR: number;
+  previousRateToQAR?: number;
+  vaultBalance: number;
+  balanceQAREquivalent: number;
+  recordedBy: string;
+  changeType: 'Rate Update' | 'Vault Audit' | 'Daily EOD Snapshot' | 'Manual Log' | 'Initial Baseline';
+  notes?: string;
+}
+
+export interface UserAccount {
+  id: string;
+  name: string;
+  nameAr?: string;
+  username: string; // e.g. 'admin' or email
+  email: string;
+  password: string; // Plaintext representation in administrative audit/manager
+  role: UserRole;
+  phone?: string;
+  avatar?: string;
+  department?: string;
+  vendorId?: string; // Links to HotelVendor id if role is 'vendor-partner'
+  status: 'active' | 'inactive';
+  lastLogin?: string;
+  createdAt: string;
 }

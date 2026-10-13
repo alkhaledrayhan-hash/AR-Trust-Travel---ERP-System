@@ -8,12 +8,15 @@ import {
   Globe,
   Save,
   CheckCircle2,
+  KeyRound,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { UserAccountsManagerView } from './UserAccountsManagerView';
 
 export const SettingsView: React.FC = () => {
-  const { language, rates } = useApp();
+  const { language, rates, currentRole } = useApp();
 
+  const [activeSubTab, setActiveSubTab] = useState<'general' | 'accounts'>('general');
   const [agencyName, setAgencyName] = useState('AR Trust Travel & Tourism W.L.L.');
   const [crNumber, setCrNumber] = useState('CR-QA-109482');
   const [tourismLicense, setTourismLicense] = useState('QTA-DMC-8819');
@@ -29,26 +32,57 @@ export const SettingsView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-5 pb-8 max-w-4xl">
-      {/* Header */}
-      <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-between shadow-xs">
-        <div>
-          <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <Settings className="w-5 h-5 text-slate-500" />
-            <span>{language === 'ar' ? 'إعدادات المنظومة والترخيص' : 'Agency ERP & License Configuration'}</span>
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Qatar Tourism accreditation, QCB currency peg rules & WhatsApp messaging gateway
-          </p>
-        </div>
+    <div className="space-y-5 pb-8 max-w-5xl">
+      {/* Sub-tab Switcher Banner */}
+      <div className="flex items-center gap-2 p-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-fit shadow-2xs">
+        <button
+          onClick={() => setActiveSubTab('general')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeSubTab === 'general'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <Settings className="w-3.5 h-3.5" />
+          <span>{language === 'ar' ? 'إعدادات المنظومة والترخيص' : 'Agency ERP & Licensing'}</span>
+        </button>
 
-        {saved && (
-          <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-mono">
-            <CheckCircle2 className="w-4 h-4" />
-            <span>Settings Saved</span>
-          </span>
-        )}
+        <button
+          onClick={() => setActiveSubTab('accounts')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeSubTab === 'accounts'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <KeyRound className="w-3.5 h-3.5 text-amber-500" />
+          <span>{language === 'ar' ? 'حسابات الدخول وكلمات المرور (IDs & Passwords)' : 'User Accounts & Passwords (Admin)'}</span>
+        </button>
       </div>
+
+      {activeSubTab === 'accounts' ? (
+        <UserAccountsManagerView />
+      ) : (
+        <>
+          {/* Header */}
+          <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-between shadow-xs">
+            <div>
+              <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Settings className="w-5 h-5 text-slate-500" />
+                <span>{language === 'ar' ? 'إعدادات المنظومة والترخيص' : 'Agency ERP & License Configuration'}</span>
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Qatar Tourism accreditation, QCB currency peg rules & WhatsApp messaging gateway
+              </p>
+            </div>
+
+            {saved && (
+              <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-mono">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Settings Saved</span>
+              </span>
+            )}
+          </div>
 
       <form onSubmit={handleSave} className="space-y-4 text-xs">
         {/* Profile Card */}
@@ -119,13 +153,15 @@ export const SettingsView: React.FC = () => {
         <div className="flex justify-end pt-2">
           <button
             type="submit"
-            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold flex items-center gap-2 shadow-xs"
+            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold flex items-center gap-2 shadow-xs cursor-pointer"
           >
             <Save className="w-4 h-4" />
             <span>Save Preferences</span>
           </button>
         </div>
       </form>
-    </div>
-  );
+    </>
+  )}
+</div>
+);
 };

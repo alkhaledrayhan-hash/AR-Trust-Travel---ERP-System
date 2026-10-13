@@ -58,8 +58,8 @@ export function parseRecordDate(dateStr: string | undefined | null): Date | null
   const trimmed = dateStr.trim();
   const lower = trimmed.toLowerCase();
 
-  // 1. Relative "Today" or "Yesterday"
-  if (lower.includes('today')) {
+  // 1. Relative "Today", "Yesterday", "Just now" or "Now"
+  if (lower.includes('today') || lower.includes('just now') || lower === 'now') {
     return new Date(2026, 9, 9);
   }
   if (lower.includes('yesterday')) {
@@ -156,8 +156,8 @@ export function matchesDateFilter(
 
   const d = parseRecordDate(dateStr);
   if (!d) {
-    // If no date could be parsed, let it pass only if filter is ALL, else false
-    return filter.preset === 'ALL' && filter.year === 'ALL';
+    // If no date could be parsed, let it pass so freshly inputted or custom records are not hidden
+    return true;
   }
 
   const recYear = d.getFullYear();

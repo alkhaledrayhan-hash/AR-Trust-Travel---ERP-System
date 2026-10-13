@@ -9,6 +9,9 @@ import {
   Search,
   ExternalLink,
   Share2,
+  Edit3,
+  X,
+  Calendar,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Booking } from '../../types';
@@ -21,6 +24,9 @@ export const LiveAirportBookingsWidget: React.FC = () => {
     convertAmount,
     currency,
     updateBookingStatus,
+    updateBooking,
+    drivers,
+    tourGuides,
     toggleVoucherSent,
     openModal,
     language,
@@ -30,6 +36,7 @@ export const LiveAirportBookingsWidget: React.FC = () => {
 
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
 
   // Filter bookings based on date filter, global search & local filter
   const filteredBookings = bookings.filter((b) => {
@@ -67,8 +74,8 @@ export const LiveAirportBookingsWidget: React.FC = () => {
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             {language === 'ar'
-              ? 'تحقق فوري من التذاكر الإلكترونية، ركاب المطار، وإرسال قسائم الواتساب'
-              : 'Hamad Int’l Counter 4 queue, QR boarding passes & instant WhatsApp dispatch'}
+              ? 'تحقق فوري من التذاكر الإلكترونية، ركاب المطار ومكاتب الفنادق، وإرسال قسائم الواتساب'
+              : 'Agent Desk & Hotel counters queue, QR boarding passes & instant WhatsApp dispatch'}
           </p>
         </div>
 
@@ -108,8 +115,8 @@ export const LiveAirportBookingsWidget: React.FC = () => {
       <div className="overflow-x-auto mt-3">
         <table className="w-full text-left rtl:text-right border-collapse">
           <thead>
-            <tr className="border-b border-slate-200 dark:border-slate-800 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-              <th className="py-2.5 px-3">Passenger & Flight</th>
+            <tr className="bg-slate-50/80 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              <th className="py-2.5 px-3">Lead Passenger</th>
               <th className="py-2.5 px-3">Package Tour</th>
               <th className="py-2.5 px-3 text-right rtl:text-left">Amount ({currency})</th>
               <th className="py-2.5 px-3">Driver / Chauffeur</th>
@@ -121,7 +128,7 @@ export const LiveAirportBookingsWidget: React.FC = () => {
             {filteredBookings.length === 0 ? (
               <tr>
                 <td colSpan={6} className="py-8 text-center text-slate-400">
-                  No airport desk bookings match the active query.
+                  No agent desk bookings match the active query.
                 </td>
               </tr>
             ) : (
@@ -130,20 +137,20 @@ export const LiveAirportBookingsWidget: React.FC = () => {
                 return (
                   <tr
                     key={booking.id}
-                    className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors group"
+                    onClick={() => setEditingBooking({ ...booking })}
+                    className="hover:bg-blue-50/50 dark:hover:bg-slate-800/60 transition-colors group cursor-pointer"
+                    title="Click booking to view full details and edit status / info"
                   >
-                    {/* Passenger & Flight */}
+                    {/* Passenger Details */}
                     <td className="py-3 px-3">
                       <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
                         <span>{booking.passengerName}</span>
                         <span className="text-[10px] font-mono text-slate-400">({booking.paxCount} pax)</span>
                       </div>
                       <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5 font-mono mt-0.5">
-                        <span className="font-bold text-blue-600 dark:text-blue-400">{booking.flightNumber}</span>
+                        <span>{booking.nationality}</span>
                         <span>·</span>
-                        <span>Arr: {booking.arrivalTime}</span>
-                        <span>·</span>
-                        <span className="text-slate-400">{booking.pickupBay}</span>
+                        <span>{booking.passengerPhone}</span>
                       </div>
                     </td>
 
@@ -181,7 +188,8 @@ export const LiveAirportBookingsWidget: React.FC = () => {
                     {/* Status Badge */}
                     <td className="py-3 px-3 text-center">
                       <button
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           const nextStatus: Record<string, Booking['qrStatus']> = {
                             'scheduled': 'checked-in',
                             'checked-in': 'in-transit',
@@ -207,21 +215,39 @@ export const LiveAirportBookingsWidget: React.FC = () => {
                       </button>
                     </td>
 
-                    {/* Actions: QR Pass & WhatsApp */}
+                    {/* Actions: QR Pass & WhatsApp & Edit */}
                     <td className="py-3 px-3 text-right rtl:text-left">
                       <div className="flex items-center justify-end rtl:justify-start gap-1.5">
+                        {/* Edit Full Dossier */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingBooking({ ...booking });
+                          }}
+                          className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors"
+                          title="View Full Booking Details & Edit"
+                        >
+                          <Edit3 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                        </button>
+
                         {/* Digital QR Boarding Pass Modal Button */}
                         <button
-                          onClick={() => openModal('qr-voucher', booking)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openModal('qr-voucher', booking);
+                          }}
                           className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors"
                           title="View QR Voucher Pass"
                         >
-                          <QrCode className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                          <QrCode className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                         </button>
 
                         {/* WhatsApp Instant Voucher Dispatch */}
                         <button
-                          onClick={() => handleCopyWhatsApp(booking)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopyWhatsApp(booking);
+                          }}
                           className={`p-1.5 rounded-lg border text-xs flex items-center gap-1 transition-all ${
                             copiedId === booking.id
                               ? 'bg-emerald-600 text-white border-emerald-600'
@@ -249,11 +275,268 @@ export const LiveAirportBookingsWidget: React.FC = () => {
         <span className="font-mono">Showing {Math.min(6, filteredBookings.length)} of {bookings.length} reservations</span>
         <button
           onClick={() => openModal('new-booking')}
-          className="text-blue-600 dark:text-blue-400 font-semibold hover:underline"
+          className="text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer"
         >
-          + Add Airport Desk Walk-In
+          + Add Agent Desk Walk-In
         </button>
       </div>
+
+      {/* Edit Booking Details Modal */}
+      {editingBooking && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs select-none">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+            <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-800/80 shrink-0">
+              <div className="flex items-center gap-2">
+                <Edit3 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">
+                  Booking Dossier & Admin Edit ({editingBooking.pnr})
+                </h3>
+              </div>
+              <button onClick={() => setEditingBooking(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                updateBooking(editingBooking.id, editingBooking);
+                setEditingBooking(null);
+              }}
+              className="p-6 space-y-4 text-xs overflow-y-auto flex-1"
+            >
+              {/* Passenger & Origin */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Passenger Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editingBooking.passengerName}
+                    onChange={(e) => setEditingBooking({ ...editingBooking, passengerName: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Nationality
+                  </label>
+                  <input
+                    type="text"
+                    value={editingBooking.nationality}
+                    onChange={(e) => setEditingBooking({ ...editingBooking, nationality: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-medium"
+                  />
+                </div>
+              </div>
+
+              {/* Booking Date & Time */}
+              <div className="grid grid-cols-2 gap-3 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-blue-500" />
+                    <span>Booking Date</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={editingBooking.bookingDate || '2026-10-15'}
+                    onChange={(e) => setEditingBooking({ ...editingBooking, bookingDate: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Booking / Pickup Time</span>
+                  </label>
+                  <input
+                    type="time"
+                    value={editingBooking.bookingTime || editingBooking.arrivalTime || '14:30'}
+                    onChange={(e) => setEditingBooking({ ...editingBooking, bookingTime: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono font-bold"
+                  />
+                </div>
+              </div>
+
+              {/* Contact & PAX */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Contact Phone
+                  </label>
+                  <input
+                    type="text"
+                    value={editingBooking.passengerPhone}
+                    onChange={(e) => setEditingBooking({ ...editingBooking, passengerPhone: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Passenger Count (PAX)
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={editingBooking.paxCount}
+                    onChange={(e) => setEditingBooking({ ...editingBooking, paxCount: Number(e.target.value) })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono font-bold"
+                  />
+                </div>
+              </div>
+
+              {/* Status & PAX */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Booking Status
+                  </label>
+                  <select
+                    value={editingBooking.qrStatus}
+                    onChange={(e) => setEditingBooking({ ...editingBooking, qrStatus: e.target.value as any })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold"
+                  >
+                    <option value="pending">Pending Approval</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="driver-assigned">Driver Assigned</option>
+                    <option value="checked-in">Checked In / On Board</option>
+                    <option value="in-transit">In Transit</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    PAX Count
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={editingBooking.paxCount}
+                    onChange={(e) => setEditingBooking({ ...editingBooking, paxCount: Number(e.target.value) })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Driver & Guide */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Chauffeur
+                  </label>
+                  <select
+                    value={editingBooking.driverId || ''}
+                    onChange={(e) => {
+                      const d = drivers.find((drv) => drv.id === e.target.value);
+                      setEditingBooking({
+                        ...editingBooking,
+                        driverId: e.target.value,
+                        driverName: d ? d.name : 'Unassigned',
+                        driverVehicle: d ? `${d.vehicle} (${d.plateNumber})` : editingBooking.driverVehicle,
+                        driverPhone: d ? d.phone : editingBooking.driverPhone,
+                      });
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-medium"
+                  >
+                    <option value="">Unassigned</option>
+                    {drivers.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} — {d.vehicle}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Tour Guide
+                  </label>
+                  <select
+                    value={editingBooking.guideId || ''}
+                    onChange={(e) => {
+                      const g = tourGuides.find((gd) => gd.id === e.target.value);
+                      setEditingBooking({
+                        ...editingBooking,
+                        guideId: e.target.value,
+                        guideName: g ? g.name : '',
+                      });
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-medium"
+                  >
+                    <option value="">No Guide</option>
+                    {tourGuides.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name} ({g.languages.join('/')})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Financials */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Revenue (QAR)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={editingBooking.totalQAR}
+                    onChange={(e) => setEditingBooking({ ...editingBooking, totalQAR: Number(e.target.value) })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Payment Method
+                  </label>
+                  <select
+                    value={editingBooking.paymentMethod}
+                    onChange={(e) => setEditingBooking({ ...editingBooking, paymentMethod: e.target.value as any })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-medium"
+                  >
+                    <option value="POS Card">POS Card</option>
+                    <option value="Cash">Cash Drawer</option>
+                    <option value="Payment Link">Payment Link</option>
+                    <option value="Prepaid OTA">Prepaid OTA</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Notes
+                </label>
+                <textarea
+                  rows={2}
+                  value={editingBooking.notes || ''}
+                  onChange={(e) => setEditingBooking({ ...editingBooking, notes: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white resize-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingBooking(null)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-xs cursor-pointer"
+                >
+                  Save Booking Updates
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

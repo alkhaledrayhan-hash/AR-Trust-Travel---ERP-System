@@ -98,7 +98,7 @@ export const ExpensesView: React.FC = () => {
     'VIP Services',
     'Fleet Maintenance',
     'Corporate HQ',
-    'Airport Desks',
+    'Agent Desks',
     'Hospitality & Tourism',
   ];
 
@@ -703,7 +703,7 @@ export const ExpensesView: React.FC = () => {
 
                 {selectedExpense.relatedDeskId && (
                   <div className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-slate-800/80">
-                    <span className="text-slate-500 font-medium">Linked Airport Desk</span>
+                    <span className="text-slate-500 font-medium">Linked Agent Desk</span>
                     <span className="text-blue-600 dark:text-blue-400 font-bold font-mono">
                       {airportDesks.find((d) => d.id === selectedExpense.relatedDeskId)?.deskName || selectedExpense.relatedDeskId}
                     </span>

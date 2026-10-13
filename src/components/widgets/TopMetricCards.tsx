@@ -46,7 +46,7 @@ export const TopMetricCards: React.FC = () => {
 
         {/* Breakdown subtext */}
         <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-          <span>68 Airport Desk</span>
+          <span>68 Agent Desk</span>
           <span className="text-slate-300 dark:text-slate-700">·</span>
           <span>52 Web OTA</span>
           <span className="text-slate-300 dark:text-slate-700">·</span>
@@ -121,7 +121,7 @@ export const TopMetricCards: React.FC = () => {
         </div>
       </div>
 
-      {/* Card 4: Pending Airport Desk Shifts */}
+      {/* Card 4: Pending Agent Desk Shifts */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs transition-all hover:border-slate-300 dark:hover:border-slate-700">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">

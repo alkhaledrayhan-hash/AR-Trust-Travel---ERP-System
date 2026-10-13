@@ -13,6 +13,7 @@ import {
   Receipt,
   Download,
   ShieldCheck,
+  X,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { DateFilterBar } from '../common/DateFilterBar';
@@ -302,12 +303,17 @@ export const PayrollCommissionView: React.FC = () => {
       {/* New Expense Modal */}
       {showExpenseModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs select-none">
-          <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4">
-            <h3 className="font-bold text-sm text-slate-900 dark:text-white">
-              Log Operational Expense
-            </h3>
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col">
+            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-800/80">
+              <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+                Log Operational Expense
+              </h3>
+              <button onClick={() => setShowExpenseModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
 
-            <form onSubmit={handleCreateExpense} className="space-y-3 text-xs">
+            <form onSubmit={handleCreateExpense} className="p-5 space-y-3 text-xs">
               <div>
                 <label className="block text-slate-500 font-medium mb-1">Expense Category</label>
                 <select

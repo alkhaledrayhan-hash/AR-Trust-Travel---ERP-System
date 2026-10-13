@@ -91,7 +91,7 @@ export const AuditLogsView: React.FC = () => {
               <span>Official Qatar Central Bank (QCB) Peg & FX Override</span>
             </h3>
             <span className="text-[10px] font-mono text-slate-500">
-              Affects all Airport Desk POS conversions & multi-currency ledgers
+              Affects all Agent Desk POS conversions & multi-currency ledgers
             </span>
           </div>
 

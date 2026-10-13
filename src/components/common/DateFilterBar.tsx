@@ -9,7 +9,6 @@ import {
   CalendarRange,
 } from 'lucide-react';
 import {
-  AVAILABLE_YEARS,
   DateFilterState,
   DEFAULT_DATE_FILTER,
   MONTH_NAMES_SHORT,
@@ -44,23 +43,6 @@ export const DateFilterBar: React.FC<DateFilterBarProps> = ({
     filter.preset !== 'ALL' ||
     Boolean(filter.startDate) ||
     Boolean(filter.endDate);
-
-  const handleYearSelect = (year: number | 'ALL') => {
-    if (year === 'ALL') {
-      onChange({
-        ...filter,
-        year: 'ALL',
-        month: 'ALL',
-        preset: 'ALL',
-      });
-    } else {
-      onChange({
-        ...filter,
-        year,
-        preset: 'CUSTOM',
-      });
-    }
-  };
 
   const handlePresetSelect = (
     preset: DateFilterState['preset'],
@@ -156,35 +138,6 @@ export const DateFilterBar: React.FC<DateFilterBarProps> = ({
 
         {/* Center / Right Side: Year Pills & Quick Presets */}
         <div className="flex items-center gap-1.5 flex-wrap">
-          {/* Year Buttons */}
-          <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-xs font-semibold">
-            <span className="px-2 text-[10px] uppercase font-bold text-slate-400">Year:</span>
-            <button
-              onClick={() => handleYearSelect('ALL')}
-              className={`px-2.5 py-1 rounded-lg text-xs transition cursor-pointer ${
-                filter.year === 'ALL'
-                  ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 font-bold shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              All Years
-            </button>
-            {AVAILABLE_YEARS.map((yr) => (
-              <button
-                key={yr}
-                onClick={() => handleYearSelect(yr)}
-                className={`px-2.5 py-1 rounded-lg text-xs transition cursor-pointer flex items-center gap-1 ${
-                  filter.year === yr
-                    ? 'bg-blue-600 text-white font-bold shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                <span>{yr}</span>
-                {yr === 2026 && <span className="text-[9px] opacity-80">(Cur)</span>}
-              </button>
-            ))}
-          </div>
-
           {/* Quick Presets */}
           <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800/60 p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
             <button
@@ -216,26 +169,6 @@ export const DateFilterBar: React.FC<DateFilterBarProps> = ({
               }`}
             >
               This Month
-            </button>
-            <button
-              onClick={() => handlePresetSelect('THIS_YEAR')}
-              className={`px-2 py-1 rounded-lg text-[11px] font-medium transition cursor-pointer ${
-                filter.preset === 'THIS_YEAR'
-                  ? 'bg-blue-600 text-white font-bold shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              2026 (YTD)
-            </button>
-            <button
-              onClick={() => handlePresetSelect('LAST_YEAR')}
-              className={`px-2 py-1 rounded-lg text-[11px] font-medium transition cursor-pointer ${
-                filter.preset === 'LAST_YEAR'
-                  ? 'bg-blue-600 text-white font-bold shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              2025
             </button>
             <button
               onClick={() => {

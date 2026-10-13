@@ -198,11 +198,11 @@ export const FinancialReportsView: React.FC = () => {
                   <span>{convertAmount(onlineWebSalesQAR).formatted}</span>
                 </div>
                 <div className="flex justify-between text-slate-500 text-[11px] pl-4">
-                  <span>Airport Desk POS Card Terminals (HIA Counters 4 & 7)</span>
+                  <span>Agent Desk POS Card Terminals (HIA & Hotel Stations)</span>
                   <span>{convertAmount(posCardSalesQAR).formatted}</span>
                 </div>
                 <div className="flex justify-between text-slate-500 text-[11px] pl-4">
-                  <span>Airport Desk Cash Drawer Collections</span>
+                  <span>Agent Desk Cash Drawer Collections</span>
                   <span>{convertAmount(cashDeskSalesQAR).formatted}</span>
                 </div>
               </div>

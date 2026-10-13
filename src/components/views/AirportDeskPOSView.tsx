@@ -29,9 +29,14 @@ import {
   Layers,
   LayoutGrid,
   List,
+  Calendar,
+  History,
+  UserCheck,
+  ShieldCheck,
+  BedDouble,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { Currency, TourPackage, AirportDesk, Employee } from '../../types';
+import { Currency, TourPackage, AirportDesk, Employee, DeskAssignmentRecord } from '../../types';
 import { DateFilterBar } from '../common/DateFilterBar';
 import { matchesDateFilter } from '../../utils/dateFilter';
 
@@ -51,8 +56,13 @@ export const AirportDeskPOSView: React.FC = () => {
     addAirportDesk,
     updateAirportDesk,
     deleteAirportDesk,
+    deskAssignmentHistory,
+    assignEmployeeToDesk,
+    addDeskAssignmentRecord,
+    deleteDeskAssignmentRecord,
     employees,
     bookings,
+    hotelVendors,
     setActiveTab,
     openModal,
     language,
@@ -61,11 +71,22 @@ export const AirportDeskPOSView: React.FC = () => {
     t,
   } = useApp();
 
-  // View Mode: 'all-desks' (All Desks Overview & Management) or 'terminal' (Live POS checkout)
-  const [activeViewMode, setActiveViewMode] = useState<'terminal' | 'all-desks'>('all-desks');
+  // View Mode: 'all-desks' (All Desks Overview), 'assignment-history' (Date-by-date Desk Assignment History), or 'terminal' (Live POS checkout)
+  const [activeViewMode, setActiveViewMode] = useState<'all-desks' | 'assignment-history' | 'terminal'>('all-desks');
 
   // Display layout mode: 'card' (Grid Cards) or 'list' (Table / List view)
   const [deskDisplayLayout, setDeskDisplayLayout] = useState<'card' | 'list'>('card');
+
+  // Assignment History State ("kon date date kauke airport er desk a assign kora hoicilo oitar ekta history dekha jabe")
+  const [assignmentSearchQuery, setAssignmentSearchQuery] = useState('');
+  const [assignmentDeskFilter, setAssignmentDeskFilter] = useState('ALL');
+  const [assignmentStaffFilter, setAssignmentStaffFilter] = useState('ALL');
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [assignTargetDeskId, setAssignTargetDeskId] = useState<string>('desk-hia-01');
+  const [assignTargetStaffId, setAssignTargetStaffId] = useState<string>('');
+  const [assignShiftTiming, setAssignShiftTiming] = useState('06:00 AM - 14:30 PM (Morning Shift)');
+  const [assignDateInput, setAssignDateInput] = useState('Oct 09, 2026, 06:00 AM');
+  const [assignNotes, setAssignNotes] = useState('');
 
   // Desk management modals
   const [showAddDeskModal, setShowAddDeskModal] = useState(false);
@@ -111,6 +132,8 @@ export const AirportDeskPOSView: React.FC = () => {
   const [passengerPhone, setPassengerPhone] = useState('+44 7921 554321');
   const [flightNumber, setFlightNumber] = useState('QR 138');
   const [selectedDriverId, setSelectedDriverId] = useState(drivers[0]?.id || 'drv-01');
+  const [bookingDate, setBookingDate] = useState('2026-10-15');
+  const [bookingTime, setBookingTime] = useState('14:30');
 
   // Cash Tender Calculator
   const [tenderCurrency, setTenderCurrency] = useState<Currency>('USD');
@@ -132,18 +155,25 @@ export const AirportDeskPOSView: React.FC = () => {
   const tenderedValueInQAR = tenderedAmount * rateToQAR;
   const changeDueQAR = tenderedValueInQAR - totalQAR;
 
-  // Filtered airport desks
+  // Filtered agent desks (Airport Counters + Hotel Partner Desks)
   const filteredDesks = useMemo(() => {
     return airportDesks.filter((desk) => {
-      if (selectedAirportFilter !== 'ALL' && desk.airportCode !== selectedAirportFilter) return false;
+      if (selectedAirportFilter === 'HOTELS') {
+        if (desk.deskType !== 'Hotel Vendor Desk' && !desk.hotelVendorId && desk.airportCode !== 'DOH-HOTEL') return false;
+      } else if (selectedAirportFilter === 'AIRPORTS') {
+        if (desk.deskType === 'Hotel Vendor Desk' || desk.airportCode === 'DOH-HOTEL') return false;
+      } else if (selectedAirportFilter !== 'ALL' && desk.airportCode !== selectedAirportFilter) {
+        return false;
+      }
       if (deskSearchQuery.trim()) {
         const query = deskSearchQuery.toLowerCase();
-        const matchesName = desk.deskName.toLowerCase().includes(query);
-        const matchesCode = desk.deskCode.toLowerCase().includes(query);
-        const matchesStaff = desk.assignedEmployeeName.toLowerCase().includes(query);
-        const matchesAirport = desk.airportName.toLowerCase().includes(query);
-        const matchesTerminal = desk.terminal.toLowerCase().includes(query);
-        if (!matchesName && !matchesCode && !matchesStaff && !matchesAirport && !matchesTerminal) {
+        const matchesName = (desk.deskName || '').toLowerCase().includes(query);
+        const matchesCode = (desk.deskCode || '').toLowerCase().includes(query);
+        const matchesStaff = (desk.assignedEmployeeName || '').toLowerCase().includes(query);
+        const matchesAirport = (desk.airportName || '').toLowerCase().includes(query);
+        const matchesTerminal = (desk.terminal || '').toLowerCase().includes(query);
+        const matchesHotel = (desk.hotelName || '').toLowerCase().includes(query);
+        if (!matchesName && !matchesCode && !matchesStaff && !matchesAirport && !matchesTerminal && !matchesHotel) {
           return false;
         }
       }
@@ -151,11 +181,51 @@ export const AirportDeskPOSView: React.FC = () => {
     });
   }, [airportDesks, selectedAirportFilter, deskSearchQuery]);
 
+  // Filtered Desk Staff Assignment History (Date-by-date roster)
+  const filteredAssignments = useMemo(() => {
+    return deskAssignmentHistory.filter((rec) => {
+      // 1. Date & Year Filter
+      if (!matchesDateFilter(rec.assignedDate, dateFilter)) return false;
+      // 2. Desk filter
+      if (assignmentDeskFilter !== 'ALL' && rec.deskId !== assignmentDeskFilter && rec.deskCode !== assignmentDeskFilter) return false;
+      // 3. Staff filter
+      if (assignmentStaffFilter !== 'ALL' && rec.employeeId !== assignmentStaffFilter) return false;
+      // 4. Search query
+      if (assignmentSearchQuery.trim()) {
+        const q = assignmentSearchQuery.toLowerCase();
+        const matchStaff = rec.employeeName.toLowerCase().includes(q) || rec.employeeRole.toLowerCase().includes(q);
+        const matchDesk = rec.deskCode.toLowerCase().includes(q) || rec.deskName.toLowerCase().includes(q) || rec.airportCode.toLowerCase().includes(q);
+        const matchDate = rec.assignedDate.toLowerCase().includes(q);
+        const matchNotes = (rec.notes || '').toLowerCase().includes(q);
+        if (!matchStaff && !matchDesk && !matchDate && !matchNotes) return false;
+      }
+      return true;
+    });
+  }, [deskAssignmentHistory, dateFilter, assignmentDeskFilter, assignmentStaffFilter, assignmentSearchQuery]);
+
   // Aggregate desk metrics
   const totalDesksCount = airportDesks.length;
   const activeDesksCount = airportDesks.filter((d) => d.status === 'Active').length;
   const totalDrawerCashSum = airportDesks.reduce((acc, d) => acc + (d.currentDrawerCashQAR || 0), 0);
   const totalDailyTargetSum = airportDesks.reduce((acc, d) => acc + (d.dailyTargetQAR || 0), 0);
+
+  // Handle Log / Station Staff to Desk
+  const handleAssignStaff = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!assignTargetDeskId || !assignTargetStaffId) {
+      setFeedbackMessage({ text: 'Please select both an Agent Desk and Staff Member.', type: 'error' });
+      return;
+    }
+    const res = assignEmployeeToDesk(assignTargetDeskId, assignTargetStaffId, assignShiftTiming, assignNotes);
+    if (res.success) {
+      setShowAssignModal(false);
+      setAssignNotes('');
+      setFeedbackMessage({ text: 'Staff member successfully stationed and recorded in assignment history!', type: 'success' });
+      setTimeout(() => setFeedbackMessage(null), 3500);
+    } else {
+      setFeedbackMessage({ text: res.error || 'Failed to station staff', type: 'error' });
+    }
+  };
 
   // Handle Create Airport Desk
   const handleCreateDesk = (e: React.FormEvent) => {
@@ -179,7 +249,7 @@ export const AirportDeskPOSView: React.FC = () => {
       operatingHours: newOperatingHours,
       dailyTargetQAR: Number(newDailyTargetQAR),
       currentDrawerCashQAR: Number(newDrawerCashQAR),
-      notes: 'Provisioned counter via Airport Desk POS Management.',
+      notes: 'Provisioned counter via Agent Desk POS Management.',
     });
 
     if (res.success) {
@@ -219,7 +289,7 @@ export const AirportDeskPOSView: React.FC = () => {
 
   // Handle Delete Desk
   const handleDeleteDesk = (id: string, code: string) => {
-    if (confirm(`Are you sure you want to remove Airport Desk ${code}?`)) {
+    if (confirm(`Are you sure you want to remove Agent Desk ${code}?`)) {
       const res = deleteAirportDesk(id);
       if (res.success) {
         if (inspectingDesk?.id === id) setInspectingDesk(null);
@@ -264,8 +334,12 @@ export const AirportDeskPOSView: React.FC = () => {
       qrStatus: 'checked-in',
       qrCodeUrl: `https://artrust.qa/voucher/${pnr}`,
       voucherSent: true,
+      bookingDate,
+      bookingTime,
+      deskId: activeDesk?.id,
+      deskCode: activeDesk?.deskCode,
       notes: `POS Cash Drawer Tendered ${tenderedAmount} ${tenderCurrency}. Desk: ${activeDesk?.deskCode || 'CTR-04'}. Staff: ${activeDesk?.assignedEmployeeName || 'Agent'}. Change given: ${changeDueQAR.toFixed(2)} QAR.`,
-      source: 'Airport Desk',
+      source: 'Agent Desk',
     });
 
     setLastIssuedPNR(pnr);
@@ -306,9 +380,9 @@ export const AirportDeskPOSView: React.FC = () => {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                <span>{activeDesk ? activeDesk.deskName : 'Airport Desk POS'}</span>
+                <span>{activeDesk ? activeDesk.deskName : 'Agent Desk POS'}</span>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-bold">
-                  {activeDesk ? activeDesk.deskCode : 'HIA-CTR-04'}
+                  {activeDesk ? activeDesk.deskCode : 'RC-DK-01'}
                 </span>
               </h2>
 
@@ -325,14 +399,33 @@ export const AirportDeskPOSView: React.FC = () => {
             </div>
 
             <p className="text-xs text-slate-500 mt-1 flex items-center gap-2">
-              <span>{activeDesk?.airportName || 'Hamad International Airport'} · {activeDesk?.terminal || 'Terminal 1'}</span>
-              <span>• Phone: {activeDesk?.phoneExt || '+974 4010 4480'}</span>
+              <span>{activeDesk?.airportName || 'Hotel Vendor Desk / Airport Station'} · {activeDesk?.terminal || 'Lobby Concierge'}</span>
+              <span>• Phone: {activeDesk?.phoneExt || '+974 4484 8120'}</span>
             </p>
           </div>
         </div>
 
         {/* View Mode Switcher & Quick Buttons */}
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Quick Shortcuts to Hotel Booking & Vendors */}
+          <button
+            onClick={() => setActiveTab('hotel-bookings')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 transition-colors"
+            title="Book rooms in partner hotels"
+          >
+            <BedDouble className="w-3.5 h-3.5 text-amber-500" />
+            <span>Hotel Booking</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('vendors')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors"
+            title="Manage Qatar Hotel Vendors"
+          >
+            <Building2 className="w-3.5 h-3.5 text-blue-500" />
+            <span>Hotel Vendors</span>
+          </button>
+
           {/* Mode Switch Tabs: All Desks & Details is FIRST and active by default */}
           <div className="flex items-center p-1 rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 shadow-xs">
             <button
@@ -345,6 +438,19 @@ export const AirportDeskPOSView: React.FC = () => {
             >
               <Building2 className="w-3.5 h-3.5" />
               <span>All Desks & Details ({airportDesks.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveViewMode('assignment-history')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeViewMode === 'assignment-history'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+              title="View on which dates staff was stationed/assigned to agent desks"
+            >
+              <History className="w-3.5 h-3.5" />
+              <span>Assignment History ({deskAssignmentHistory.length})</span>
             </button>
 
             <button
@@ -400,7 +506,7 @@ export const AirportDeskPOSView: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
               <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold">
-                <span>Total Airport Counters</span>
+                <span>Total Agent Desks</span>
                 <Building2 className="w-4 h-4 text-blue-500" />
               </div>
               <div className="mt-2 flex items-baseline gap-2">
@@ -408,7 +514,7 @@ export const AirportDeskPOSView: React.FC = () => {
                 <span className="text-xs font-bold text-emerald-600">({activeDesksCount} Active)</span>
               </div>
               <div className="mt-1 text-[11px] text-slate-400 font-mono">
-                Hamad Int’l (HIA) & Doha Int’l (DIA)
+                {airportDesks.filter((d) => d.deskType === 'Hotel Vendor Desk').length} Qatar Hotel Desks · {airportDesks.filter((d) => d.deskType !== 'Hotel Vendor Desk').length} Airport Terminals
               </div>
             </div>
 
@@ -466,7 +572,7 @@ export const AirportDeskPOSView: React.FC = () => {
             filter={dateFilter}
             onChange={setDateFilter}
             totalCount={airportDesks.length}
-            label={language === 'ar' ? 'تصفية بيانات كاونترات المطار بالسنة' : 'Airport Desks Date & Year Filter'}
+            label={language === 'ar' ? 'تصفية بيانات مكاتب الوكلاء والفنادق بالسنة' : 'Agent Desks Date & Year Filter'}
           />
 
           {/* Search, Filter Bar and Add Button */}
@@ -483,19 +589,24 @@ export const AirportDeskPOSView: React.FC = () => {
                 />
               </div>
 
-              {/* Airport Filter */}
-              <div className="flex items-center gap-1.5">
-                {['ALL', 'HIA', 'DIA'].map((airport) => (
+              {/* Desk Location Type Filter */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                {[
+                  { id: 'ALL', label: 'All Desks' },
+                  { id: 'HOTELS', label: '🏨 Qatar Hotels' },
+                  { id: 'HIA', label: '✈️ HIA Airport' },
+                  { id: 'DIA', label: '✈️ DIA Airport' },
+                ].map((item) => (
                   <button
-                    key={airport}
-                    onClick={() => setSelectedAirportFilter(airport)}
+                    key={item.id}
+                    onClick={() => setSelectedAirportFilter(item.id)}
                     className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      selectedAirportFilter === airport
+                      selectedAirportFilter === item.id
                         ? 'bg-slate-900 text-white dark:bg-blue-600'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                     }`}
                   >
-                    {airport === 'ALL' ? 'All Airports' : `${airport} Counters`}
+                    {item.label}
                   </button>
                 ))}
               </div>
@@ -536,7 +647,7 @@ export const AirportDeskPOSView: React.FC = () => {
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-sm transition-all cursor-pointer self-start md:self-auto"
             >
               <Plus className="w-4 h-4" />
-              <span>+ Add New Airport Desk</span>
+              <span>+ Add New Agent Desk</span>
             </button>
           </div>
 
@@ -559,13 +670,19 @@ export const AirportDeskPOSView: React.FC = () => {
                   {/* Top Badge Row */}
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <span className="text-xs font-mono font-black px-2 py-0.5 rounded-lg bg-slate-900 text-white dark:bg-slate-800 dark:text-white">
                           {desk.deskCode}
                         </span>
-                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                          {desk.airportCode}
-                        </span>
+                        {desk.deskType === 'Hotel Vendor Desk' || desk.hotelName ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                            🏨 {desk.hotelName || 'Qatar Hotel Partner'}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                            ✈️ {desk.airportCode}
+                          </span>
+                        )}
                         {isCurrentActive && (
                           <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-blue-600 text-white animate-pulse">
                             ACTIVE POS
@@ -650,6 +767,17 @@ export const AirportDeskPOSView: React.FC = () => {
                     </button>
 
                     <button
+                      onClick={() => {
+                        setAssignmentDeskFilter(desk.id);
+                        setActiveViewMode('assignment-history');
+                      }}
+                      className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors"
+                      title="View Date-by-Date Staff Assignment History"
+                    >
+                      <History className="w-4 h-4" />
+                    </button>
+
+                    <button
                       onClick={() => setInspectingDesk(desk)}
                       className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
                       title="View Full Individual Details"
@@ -683,7 +811,7 @@ export const AirportDeskPOSView: React.FC = () => {
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-850/60 text-[11px] font-bold text-slate-500 uppercase tracking-wider font-mono">
+                  <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider font-mono">
                     <th className="py-3.5 px-4">Desk & Airport</th>
                     <th className="py-3.5 px-4">Counter & Zone</th>
                     <th className="py-3.5 px-4">Stationed Personnel</th>
@@ -707,13 +835,19 @@ export const AirportDeskPOSView: React.FC = () => {
                         }`}
                       >
                         <td className="py-3.5 px-4">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-mono font-black text-xs px-2 py-0.5 rounded-lg bg-slate-900 text-white dark:bg-slate-800 dark:text-white">
                               {desk.deskCode}
                             </span>
-                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                              {desk.airportCode}
-                            </span>
+                            {desk.deskType === 'Hotel Vendor Desk' || desk.hotelName ? (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                                🏨 {desk.hotelName || 'Hotel Desk'}
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                                ✈️ {desk.airportCode}
+                              </span>
+                            )}
                             {isCurrentActive && (
                               <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-blue-600 text-white uppercase tracking-wider">
                                 ACTIVE
@@ -796,6 +930,17 @@ export const AirportDeskPOSView: React.FC = () => {
                             </button>
 
                             <button
+                              onClick={() => {
+                                setAssignmentDeskFilter(desk.id);
+                                setActiveViewMode('assignment-history');
+                              }}
+                              className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors"
+                              title="View Assignment Date History"
+                            >
+                              <History className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
                               onClick={() => setInspectingDesk(desk)}
                               className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
                               title="View Details"
@@ -832,7 +977,317 @@ export const AirportDeskPOSView: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
-      {/* MODE 2: ACTIVE DESK POS CHECKOUT TERMINAL                                 */}
+      {/* MODE 2: AIRPORT DESK STAFF ASSIGNMENT HISTORY                             */}
+      {/* "kon date date kauke airport er desk a assign kora hoicilo oitar history"  */}
+      {/* ========================================================================= */}
+      {activeViewMode === 'assignment-history' && (
+        <div className="space-y-5">
+          {/* Summary KPI Cards for Desk Staff Assignments */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold">
+                <span>Total Recorded Assignments</span>
+                <History className="w-4 h-4 text-indigo-500" />
+              </div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-black text-slate-900 dark:text-white font-mono">
+                  {deskAssignmentHistory.length}
+                </span>
+                <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                  Across 2024–2026
+                </span>
+              </div>
+              <div className="mt-1 text-[11px] text-slate-400 font-mono">
+                Historical staff rosters logged
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold">
+                <span>Currently Active Stations</span>
+                <UserCheck className="w-4 h-4 text-emerald-500" />
+              </div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                  {deskAssignmentHistory.filter((a) => a.status === 'Active').length}
+                </span>
+                <span className="text-xs text-slate-400">Staff On Active Duty</span>
+              </div>
+              <div className="mt-1 text-[11px] text-slate-400 font-mono">
+                Currently stationed at counters
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold">
+                <span>Past Shift Rotations</span>
+                <Clock className="w-4 h-4 text-blue-500" />
+              </div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-black text-slate-900 dark:text-white font-mono">
+                  {deskAssignmentHistory.filter((a) => a.status === 'Completed' || a.status === 'Reassigned').length}
+                </span>
+                <span className="text-xs font-bold text-slate-400">Archived Duties</span>
+              </div>
+              <div className="mt-1 text-[11px] text-slate-400 font-mono">
+                Successfully relieved / rotated
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold">
+                <span>Agent Desk Coverage</span>
+                <Building2 className="w-4 h-4 text-amber-500" />
+              </div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-black text-amber-600 dark:text-amber-400 font-mono">
+                  100%
+                </span>
+                <span className="text-xs font-bold text-emerald-600">All Stations Manned</span>
+              </div>
+              <div className="mt-1 text-[11px] text-slate-400 font-mono">
+                HIA, DIA & Luxury Qatar Hotel Desks
+              </div>
+            </div>
+          </div>
+
+          {/* Date & Year Filter Bar for Assignment History */}
+          <DateFilterBar
+            filter={dateFilter}
+            onChange={setDateFilter}
+            totalCount={filteredAssignments.length}
+            label={language === 'ar' ? 'تصفية سجل تعيينات الكاونترات بالسنة والتاريخ' : 'Desk Staff Assignment Date & Year History Filter'}
+          />
+
+          {/* Search, Desk Filter and Log Assignment CTA */}
+          <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs">
+            <div className="flex flex-1 flex-wrap items-center gap-3">
+              {/* Search Box */}
+              <div className="relative flex-1 min-w-[220px] max-w-sm">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={assignmentSearchQuery}
+                  onChange={(e) => setAssignmentSearchQuery(e.target.value)}
+                  placeholder="Search staff name, counter code, date, notes..."
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none"
+                />
+              </div>
+
+              {/* Desk Filter Dropdown */}
+              <select
+                value={assignmentDeskFilter}
+                onChange={(e) => setAssignmentDeskFilter(e.target.value)}
+                className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-slate-100 focus:outline-none"
+              >
+                <option value="ALL">All Agent Desks</option>
+                {airportDesks.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.airportCode}: {d.deskCode} - {d.deskName}
+                  </option>
+                ))}
+              </select>
+
+              {/* Staff Member Filter Dropdown */}
+              <select
+                value={assignmentStaffFilter}
+                onChange={(e) => setAssignmentStaffFilter(e.target.value)}
+                className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-slate-100 focus:outline-none"
+              >
+                <option value="ALL">All Stationed Staff</option>
+                {employees.map((emp) => (
+                  <option key={emp.id} value={emp.id}>
+                    {emp.name} ({emp.role})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Log / Station Staff Button */}
+            <button
+              onClick={() => {
+                setAssignTargetDeskId(activeDeskId || 'desk-hia-01');
+                setAssignTargetStaffId(employees[0]?.id || '');
+                setShowAssignModal(true);
+              }}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-sm transition-all cursor-pointer self-start md:self-auto shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              <span>+ Station / Assign Staff to Desk</span>
+            </button>
+          </div>
+
+          {/* Assignment History Table ("kon date date kauke airport er desk a assign kora hoicilo oitar ekta history dekha jabe") */}
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider font-mono">
+                    <th className="py-3.5 px-4">Assigned Date & Time</th>
+                    <th className="py-3.5 px-4">Airport & Counter</th>
+                    <th className="py-3.5 px-4">Stationed Personnel</th>
+                    <th className="py-3.5 px-4">Shift Timing</th>
+                    <th className="py-3.5 px-4">Assigned By</th>
+                    <th className="py-3.5 px-4 text-center">Status</th>
+                    <th className="py-3.5 px-4">Operational Remarks</th>
+                    <th className="py-3.5 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                  {filteredAssignments.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-12 text-center text-slate-400">
+                        <History className="w-8 h-8 mx-auto text-slate-300 dark:text-slate-700 mb-2" />
+                        <p className="font-semibold text-sm">No desk staff assignment records found</p>
+                        <p className="text-xs text-slate-400 mt-1">
+                          Try adjusting your date or desk filter, or click "+ Station / Assign Staff to Desk" to record a shift.
+                        </p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredAssignments.map((record) => {
+                      const isActive = record.status === 'Active';
+                      const desk = airportDesks.find((d) => d.id === record.deskId || d.deskCode === record.deskCode);
+
+                      return (
+                        <tr
+                          key={record.id}
+                          className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors ${
+                            isActive ? 'bg-indigo-50/30 dark:bg-indigo-950/20' : ''
+                          }`}
+                        >
+                          {/* 1. Assigned Date */}
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-2">
+                              <Calendar className="w-4 h-4 text-indigo-500 shrink-0" />
+                              <div>
+                                <span className="font-mono font-bold text-xs text-slate-900 dark:text-white block">
+                                  {record.assignedDate}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-mono">
+                                  Record #{record.id}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* 2. Airport & Desk */}
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-black text-xs px-2 py-0.5 rounded-lg bg-slate-900 text-white dark:bg-slate-800 dark:text-white">
+                                {record.deskCode}
+                              </span>
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                                {record.airportCode}
+                              </span>
+                            </div>
+                            <div className="font-bold text-slate-900 dark:text-white mt-1">
+                              {record.deskName}
+                            </div>
+                            <div className="text-[10px] text-slate-400">
+                              {record.terminal}
+                            </div>
+                          </td>
+
+                          {/* 3. Stationed Staff */}
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 flex items-center justify-center font-bold text-xs shrink-0">
+                                {record.employeeName.charAt(0)}
+                              </div>
+                              <div>
+                                <div className="font-extrabold text-slate-900 dark:text-white">
+                                  {record.employeeName}
+                                </div>
+                                <div className="text-[10px] text-slate-400 font-mono">
+                                  {record.employeeRole}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* 4. Shift Timing */}
+                          <td className="py-3.5 px-4 font-mono text-[11px] text-slate-600 dark:text-slate-300">
+                            <div className="flex items-center gap-1.5">
+                              <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                              <span>{record.shiftTiming}</span>
+                            </div>
+                          </td>
+
+                          {/* 5. Assigned By */}
+                          <td className="py-3.5 px-4 text-[11px] text-slate-600 dark:text-slate-300 font-medium">
+                            <div className="flex items-center gap-1.5">
+                              <ShieldCheck className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                              <span>{record.assignedBy}</span>
+                            </div>
+                          </td>
+
+                          {/* 6. Status Badge */}
+                          <td className="py-3.5 px-4 text-center">
+                            <span
+                              className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider inline-flex items-center gap-1 ${
+                                record.status === 'Active'
+                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                                  : record.status === 'Completed'
+                                  ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
+                                  : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                              }`}
+                            >
+                              {record.status === 'Active' && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              )}
+                              {record.status}
+                            </span>
+                          </td>
+
+                          {/* 7. Notes */}
+                          <td className="py-3.5 px-4 max-w-xs text-[11px] text-slate-500 dark:text-slate-400">
+                            <p className="line-clamp-2">{record.notes || 'Routine counter duty schedule.'}</p>
+                          </td>
+
+                          {/* 8. Actions */}
+                          <td className="py-3.5 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {desk && (
+                                <button
+                                  onClick={() => {
+                                    setInspectingDesk(desk);
+                                  }}
+                                  className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+                                  title="View Desk Details & Full History"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+
+                              <button
+                                onClick={() => {
+                                  if (confirm(`Remove assignment record for ${record.employeeName} on ${record.assignedDate}?`)) {
+                                    deleteDeskAssignmentRecord(record.id);
+                                    setFeedbackMessage({ text: 'Assignment history record removed.', type: 'success' });
+                                    setTimeout(() => setFeedbackMessage(null), 3000);
+                                  }
+                                }}
+                                className="p-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition"
+                                title="Remove Assignment Log"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODE 3: ACTIVE DESK POS CHECKOUT TERMINAL                                 */}
       {/* ========================================================================= */}
       {activeViewMode === 'terminal' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
@@ -995,6 +1450,28 @@ export const AirportDeskPOSView: React.FC = () => {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-slate-500 text-[11px] mb-1 font-semibold">Tour Booking Date:</label>
+                  <input
+                    type="date"
+                    value={bookingDate}
+                    onChange={(e) => setBookingDate(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-100 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-500 text-[11px] mb-1 font-semibold">Scheduled Tour Time:</label>
+                  <input
+                    type="time"
+                    value={bookingTime}
+                    onChange={(e) => setBookingTime(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-100 font-mono font-bold"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="block text-slate-500 text-[11px] mb-1">Assign Chauffeur / Guide:</label>
                 <select
@@ -1097,8 +1574,8 @@ export const AirportDeskPOSView: React.FC = () => {
       {/* ========================================================================= */}
       {inspectingDesk && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs overflow-y-auto">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 max-w-2xl w-full p-6 shadow-2xl space-y-5 my-8">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 max-w-2xl w-full shadow-2xl overflow-hidden flex flex-col my-8">
+            <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-800/80 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold">
                   <Building2 className="w-5 h-5" />
@@ -1252,8 +1729,8 @@ export const AirportDeskPOSView: React.FC = () => {
       {/* ========================================================================= */}
       {editingDesk && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs overflow-y-auto">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 max-w-lg w-full p-6 shadow-2xl space-y-4 my-8">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 max-w-lg w-full shadow-2xl overflow-hidden flex flex-col my-8">
+            <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-800/80 shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold">
                   <Edit3 className="w-5 h-5" />
@@ -1459,17 +1936,17 @@ export const AirportDeskPOSView: React.FC = () => {
       {/* ========================================================================= */}
       {showAddDeskModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs overflow-y-auto">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 max-w-lg w-full p-6 shadow-2xl space-y-4 my-8">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 max-w-lg w-full shadow-2xl overflow-hidden flex flex-col my-8">
+            <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-800/80 shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold">
                   <Store className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
-                    Add New Airport Desk Counter
+                    Add New Agent Desk Counter
                   </h3>
-                  <p className="text-xs text-slate-500 font-mono">Provision new terminal point of sale</p>
+                  <p className="text-xs text-slate-500 font-mono">Provision new point of sale / hotel partner desk</p>
                 </div>
               </div>
               <button
@@ -1642,7 +2119,7 @@ export const AirportDeskPOSView: React.FC = () => {
                   type="submit"
                   className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md cursor-pointer"
                 >
-                  Create Airport Desk
+                  Create Agent Desk
                 </button>
               </div>
             </form>
@@ -1652,3 +2129,6 @@ export const AirportDeskPOSView: React.FC = () => {
     </div>
   );
 };
+
+export const AgentDeskPOSView = AirportDeskPOSView;
+export default AirportDeskPOSView;

@@ -24,9 +24,15 @@ import {
   Compass,
   LayoutGrid,
   List,
+  Percent,
+  Settings,
+  Tag,
+  Trash2,
+  Edit2,
+  Check,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { Booking, Guest } from '../../types';
+import { Booking, Guest, GuestTier } from '../../types';
 import { DateFilterBar } from '../common/DateFilterBar';
 import { matchesDateFilter } from '../../utils/dateFilter';
 
@@ -36,6 +42,10 @@ export const GuestsView: React.FC = () => {
     addGuest,
     updateGuest,
     deleteGuest,
+    guestTiers,
+    addGuestTier,
+    updateGuestTier,
+    deleteGuestTier,
     bookings,
     openModal,
     convertAmount,
@@ -52,8 +62,18 @@ export const GuestsView: React.FC = () => {
 
   // Modals state
   const [showAddGuestModal, setShowAddGuestModal] = useState(false);
+  const [showTiersModal, setShowTiersModal] = useState(false);
   const [selectedGuest, setSelectedGuest] = useState<Guest | null>(null);
   const [editingGuest, setEditingGuest] = useState<Guest | null>(null);
+
+  // Tier management form state
+  const [newTierName, setNewTierName] = useState('');
+  const [newTierDiscount, setNewTierDiscount] = useState<number>(10);
+  const [newTierColor, setNewTierColor] = useState('purple');
+  const [newTierMinSpend, setNewTierMinSpend] = useState<number>(0);
+  const [newTierDesc, setNewTierDesc] = useState('');
+  const [editingTierId, setEditingTierId] = useState<string | null>(null);
+  const [editingTierDiscount, setEditingTierDiscount] = useState<number>(0);
 
   // Notifications
   const [feedbackSuccess, setFeedbackSuccess] = useState<string | null>(null);
@@ -156,6 +176,46 @@ export const GuestsView: React.FC = () => {
     }
   };
 
+  // Handle Add Tier
+  const handleCreateTier = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTierName.trim()) {
+      showNotification('Tier name is required', true);
+      return;
+    }
+    const res = addGuestTier({
+      name: newTierName.trim(),
+      discountPercentage: Number(newTierDiscount) || 0,
+      badgeColor: newTierColor,
+      minSpendQAR: Number(newTierMinSpend) || 0,
+      description: newTierDesc.trim() || `VIP tier with ${newTierDiscount}% discount on all tours & services.`,
+    });
+    if (res.success) {
+      showNotification(`Tier "${newTierName}" added with ${newTierDiscount}% discount!`);
+      setNewTierName('');
+      setNewTierDiscount(10);
+      setNewTierMinSpend(0);
+      setNewTierDesc('');
+    } else {
+      showNotification(res.error || 'Failed to create tier', true);
+    }
+  };
+
+  const handleUpdateTierDiscount = (tierId: string, discount: number) => {
+    const res = updateGuestTier(tierId, { discountPercentage: discount });
+    if (res.success) {
+      showNotification(`Tier discount updated to ${discount}%!`);
+      setEditingTierId(null);
+    } else {
+      showNotification(res.error || 'Failed to update discount', true);
+    }
+  };
+
+  const handleDeleteTier = (tierId: string, tierName: string) => {
+    deleteGuestTier(tierId);
+    showNotification(`Tier "${tierName}" removed.`);
+  };
+
   // Get Bookings for a Guest
   const getGuestBookings = (guest: Guest): Booking[] => {
     return bookings.filter(
@@ -209,14 +269,24 @@ export const GuestsView: React.FC = () => {
           </div>
         </div>
 
-        {/* Action Button */}
-        <button
-          onClick={() => setShowAddGuestModal(true)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition shadow-sm shadow-purple-500/25 self-start xl:self-auto"
-        >
-          <Plus className="w-4 h-4" />
-          <span>{language === 'ar' ? '+ إضافة ضيف / مسافر جديد' : '+ Register New Guest'}</span>
-        </button>
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2.5 self-start xl:self-auto flex-wrap">
+          <button
+            onClick={() => setShowTiersModal(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-purple-300 dark:border-purple-800/80 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/50 text-xs font-bold transition shadow-xs cursor-pointer"
+          >
+            <Crown className="w-4 h-4 text-amber-500" />
+            <span>{language === 'ar' ? 'إدارة فئات الضيوف والخصومات' : 'Guest Tiers & Discounts'}</span>
+          </button>
+
+          <button
+            onClick={() => setShowAddGuestModal(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition shadow-sm shadow-purple-500/25 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>{language === 'ar' ? '+ إضافة ضيف / مسافر جديد' : '+ Register New Guest'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Top Stat Cards */}
@@ -307,11 +377,11 @@ export const GuestsView: React.FC = () => {
             className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-700 dark:text-slate-200"
           >
             <option value="ALL">All VIP Tiers</option>
-            <option value="VIP Platinum">VIP Platinum</option>
-            <option value="VIP Gold">VIP Gold</option>
-            <option value="VIP Silver">VIP Silver</option>
-            <option value="Standard">Standard</option>
-            <option value="Transit Special">Transit Special</option>
+            {guestTiers.map((tier) => (
+              <option key={tier.id} value={tier.name}>
+                {tier.name} ({tier.discountPercentage}% Off)
+              </option>
+            ))}
           </select>
 
           <select
@@ -497,7 +567,7 @@ export const GuestsView: React.FC = () => {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-850/60 text-[11px] font-bold text-slate-500 uppercase tracking-wider font-mono">
+                <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider font-mono">
                   <th className="py-3.5 px-4">Guest & Nationality</th>
                   <th className="py-3.5 px-4">VIP Tier</th>
                   <th className="py-3.5 px-4">Contact Phone & Email</th>
@@ -776,21 +846,21 @@ export const GuestsView: React.FC = () => {
 
       {/* 2. REGISTER NEW GUEST MODAL */}
       {showAddGuestModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-xl rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in select-none">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-xl rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+            <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-800/80 shrink-0">
               <div className="flex items-center gap-2">
-                <Plus className="w-5 h-5 text-purple-600" />
+                <Plus className="w-5 h-5 text-purple-600 dark:text-purple-400" />
                 <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
                   Register New Guest / Passenger
                 </h3>
               </div>
-              <button onClick={() => setShowAddGuestModal(false)} className="text-slate-400">
+              <button onClick={() => setShowAddGuestModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateGuest} className="mt-4 space-y-4 text-xs">
+            <form onSubmit={handleCreateGuest} className="p-6 space-y-4 text-xs overflow-y-auto flex-1">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">Guest Full Name *</label>
@@ -800,7 +870,7 @@ export const GuestsView: React.FC = () => {
                     placeholder="e.g. David Miller"
                     value={newGuestName}
                     onChange={(e) => setNewGuestName(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-medium"
                   />
                 </div>
 
@@ -812,7 +882,7 @@ export const GuestsView: React.FC = () => {
                     placeholder="e.g. United Kingdom"
                     value={newGuestNationality}
                     onChange={(e) => setNewGuestNationality(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-medium"
                   />
                 </div>
               </div>
@@ -825,7 +895,7 @@ export const GuestsView: React.FC = () => {
                     placeholder="+1 212 555 8920"
                     value={newGuestPhone}
                     onChange={(e) => setNewGuestPhone(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white font-mono"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-mono"
                   />
                 </div>
 
@@ -836,24 +906,24 @@ export const GuestsView: React.FC = () => {
                     placeholder="passenger@traveler.com"
                     value={newGuestEmail}
                     onChange={(e) => setNewGuestEmail(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">VIP Tier</label>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">VIP Tier & Discount</label>
                   <select
                     value={newGuestTier}
                     onChange={(e) => setNewGuestTier(e.target.value as any)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white font-bold"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-bold"
                   >
-                    <option value="VIP Platinum">VIP Platinum</option>
-                    <option value="VIP Gold">VIP Gold</option>
-                    <option value="VIP Silver">VIP Silver</option>
-                    <option value="Standard">Standard</option>
-                    <option value="Transit Special">Transit Special</option>
+                    {guestTiers.map((tier) => (
+                      <option key={tier.id} value={tier.name}>
+                        {tier.name} ({tier.discountPercentage}% Discount)
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -864,7 +934,7 @@ export const GuestsView: React.FC = () => {
                     placeholder="e.g. USA-7782910"
                     value={newGuestPassport}
                     onChange={(e) => setNewGuestPassport(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white font-mono"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-mono"
                   />
                 </div>
               </div>
@@ -876,7 +946,7 @@ export const GuestsView: React.FC = () => {
                   placeholder="e.g. Needs child booster seat, vegetarian snacks, airport meet & assist"
                   value={newGuestPreferences}
                   onChange={(e) => setNewGuestPreferences(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white resize-none"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white resize-none"
                 />
               </div>
 
@@ -884,7 +954,7 @@ export const GuestsView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowAddGuestModal(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                  className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300"
                 >
                   Cancel
                 </button>
@@ -902,18 +972,18 @@ export const GuestsView: React.FC = () => {
 
       {/* 3. EDIT GUEST MODAL */}
       {editingGuest && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-xl rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in select-none">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-xl rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+            <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-800/80 shrink-0">
               <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">
                 Edit Guest Dossier: {editingGuest.name}
               </h3>
-              <button onClick={() => setEditingGuest(null)} className="text-slate-400">
+              <button onClick={() => setEditingGuest(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleUpdateGuest} className="mt-4 space-y-4 text-xs">
+            <form onSubmit={handleUpdateGuest} className="p-6 space-y-4 text-xs overflow-y-auto flex-1">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">Name</label>
@@ -922,7 +992,7 @@ export const GuestsView: React.FC = () => {
                     required
                     value={editingGuest.name}
                     onChange={(e) => setEditingGuest({ ...editingGuest, name: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-medium"
                   />
                 </div>
                 <div>
@@ -932,24 +1002,24 @@ export const GuestsView: React.FC = () => {
                     required
                     value={editingGuest.nationality}
                     onChange={(e) => setEditingGuest({ ...editingGuest, nationality: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-medium"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">VIP Tier</label>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">VIP Tier & Discount</label>
                   <select
                     value={editingGuest.vipTier}
                     onChange={(e) => setEditingGuest({ ...editingGuest, vipTier: e.target.value as any })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white font-bold"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-bold"
                   >
-                    <option value="VIP Platinum">VIP Platinum</option>
-                    <option value="VIP Gold">VIP Gold</option>
-                    <option value="VIP Silver">VIP Silver</option>
-                    <option value="Standard">Standard</option>
-                    <option value="Transit Special">Transit Special</option>
+                    {guestTiers.map((tier) => (
+                      <option key={tier.id} value={tier.name}>
+                        {tier.name} ({tier.discountPercentage}% Discount)
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -958,7 +1028,7 @@ export const GuestsView: React.FC = () => {
                     type="text"
                     value={editingGuest.passportNo || ''}
                     onChange={(e) => setEditingGuest({ ...editingGuest, passportNo: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white font-mono"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-mono"
                   />
                 </div>
               </div>
@@ -969,7 +1039,7 @@ export const GuestsView: React.FC = () => {
                   rows={2}
                   value={editingGuest.specialPreferences}
                   onChange={(e) => setEditingGuest({ ...editingGuest, specialPreferences: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white resize-none"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white resize-none"
                 />
               </div>
 
@@ -977,7 +1047,7 @@ export const GuestsView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setEditingGuest(null)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                  className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300"
                 >
                   Cancel
                 </button>
@@ -989,6 +1059,272 @@ export const GuestsView: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 4. GUEST TIERS & DISCOUNTS MANAGEMENT MODAL */}
+      {showTiersModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs select-none animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+            {/* Modal Header */}
+            <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-800/80 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300">
+                  <Crown className="w-5 h-5 text-amber-500" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>Guest Membership Tiers & Discounts</span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300">
+                      ADMIN CONFIG
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Add VIP membership tiers and configure tier-wise discount percentages applied during bookings.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowTiersModal(false);
+                  setEditingTierId(null);
+                }}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-6 overflow-y-auto flex-1 text-xs">
+              {/* 1. Add New Tier Form */}
+              <div className="p-4 rounded-2xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200/80 dark:border-purple-800/60">
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5 mb-3">
+                  <Plus className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  <span>Create New Guest Tier</span>
+                </h4>
+
+                <form onSubmit={handleCreateTier} className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        Tier Name *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Royal VIP or Corporate Club"
+                        value={newTierName}
+                        onChange={(e) => setNewTierName(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-medium"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        Discount Rate (%) *
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          required
+                          value={newTierDiscount}
+                          onChange={(e) => setNewTierDiscount(Number(e.target.value))}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono font-bold pr-8"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold font-mono">
+                          %
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        Badge Accent Color
+                      </label>
+                      <select
+                        value={newTierColor}
+                        onChange={(e) => setNewTierColor(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-medium"
+                      >
+                        <option value="purple">Purple (Royal)</option>
+                        <option value="amber">Amber (Gold)</option>
+                        <option value="blue">Blue (Executive)</option>
+                        <option value="emerald">Emerald (Platinum)</option>
+                        <option value="rose">Rose (Celebrity)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        Min Spend Required (QAR)
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        placeholder="0"
+                        value={newTierMinSpend}
+                        onChange={(e) => setNewTierMinSpend(Number(e.target.value))}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono font-medium"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        Tier Perks & Description
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Complimentary airport chauffeur & 15% tour discount"
+                        value={newTierDesc}
+                        onChange={(e) => setNewTierDesc(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end pt-1">
+                    <button
+                      type="submit"
+                      className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-xs transition cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Add Tier to Registry</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* 2. Active Guest Tiers List with Inline Discount Editing */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <Crown className="w-4 h-4 text-amber-500" />
+                    <span>Configured Tiers & Tier-Wise Discount Matrix ({guestTiers.length})</span>
+                  </h4>
+                  <span className="text-[11px] text-slate-400">
+                    Live rates synced with POS & Booking Engine
+                  </span>
+                </div>
+
+                <div className="divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden bg-white dark:bg-slate-900">
+                  {guestTiers.map((tier) => {
+                    const isEditing = editingTierId === tier.id;
+
+                    return (
+                      <div
+                        key={tier.id}
+                        className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm shadow-xs ${
+                            tier.badgeColor === 'purple'
+                              ? 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300'
+                              : tier.badgeColor === 'amber'
+                              ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                              : tier.badgeColor === 'emerald'
+                              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                              : 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
+                          }`}>
+                            <Crown className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-extrabold text-slate-900 dark:text-white text-sm">
+                                {tier.name}
+                              </span>
+                              <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                {tier.discountPercentage}% OFF
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 max-w-sm">
+                              {tier.description || 'Standard loyalty perks'}
+                            </p>
+                            {tier.minSpendQAR !== undefined && tier.minSpendQAR > 0 && (
+                              <span className="text-[10px] font-mono text-purple-600 dark:text-purple-400 block mt-0.5">
+                                Min Spend: {tier.minSpendQAR.toLocaleString()} QAR
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Discount Adjustment Controls */}
+                        <div className="flex items-center gap-2 self-end sm:self-center">
+                          {isEditing ? (
+                            <div className="flex items-center gap-1.5">
+                              <div className="relative w-20">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={100}
+                                  value={editingTierDiscount}
+                                  onChange={(e) => setEditingTierDiscount(Number(e.target.value))}
+                                  className="w-full px-2 py-1 rounded-lg border border-purple-400 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono font-bold text-xs"
+                                  autoFocus
+                                />
+                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">
+                                  %
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => handleUpdateTierDiscount(tier.id, editingTierDiscount)}
+                                className="p-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 cursor-pointer"
+                                title="Save Discount"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => setEditingTierId(null)}
+                                className="p-1.5 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-400 hover:text-slate-600 cursor-pointer"
+                                title="Cancel"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setEditingTierId(tier.id);
+                                setEditingTierDiscount(tier.discountPercentage);
+                              }}
+                              className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <Edit2 className="w-3.5 h-3.5 text-blue-500" />
+                              <span>Set Discount</span>
+                            </button>
+                          )}
+
+                          <button
+                            onClick={() => handleDeleteTier(tier.id, tier.name)}
+                            className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40 dark:hover:text-rose-400 text-slate-400 transition cursor-pointer"
+                            title="Delete Tier"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex justify-end bg-slate-50/50 dark:bg-slate-800/50">
+              <button
+                onClick={() => {
+                  setShowTiersModal(false);
+                  setEditingTierId(null);
+                }}
+                className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs cursor-pointer"
+              >
+                Close & Save Preferences
+              </button>
+            </div>
           </div>
         </div>
       )}

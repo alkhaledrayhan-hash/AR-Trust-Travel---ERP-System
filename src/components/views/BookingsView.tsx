@@ -127,7 +127,6 @@ export const BookingsView: React.FC = () => {
               <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
                 <th className="py-3 px-4">PNR / Ref</th>
                 <th className="py-3 px-4">Passenger Details</th>
-                <th className="py-3 px-4">Flight & Gate</th>
                 <th className="py-3 px-4">Service Package</th>
                 <th className="py-3 px-4">Chauffeur</th>
                 <th className="py-3 px-4 text-right rtl:text-left">Total Value</th>
@@ -151,17 +150,6 @@ export const BookingsView: React.FC = () => {
                     </div>
                     <div className="text-[11px] text-slate-500 font-mono">
                       {b.passengerPhone} · {b.nationality}
-                    </div>
-                  </td>
-
-                  {/* Flight */}
-                  <td className="py-3 px-4">
-                    <div className="flex items-center gap-1 font-mono font-bold text-slate-800 dark:text-slate-200">
-                      <Plane className="w-3.5 h-3.5 text-slate-400 -rotate-45" />
-                      <span>{b.flightNumber}</span>
-                    </div>
-                    <div className="text-[10px] text-slate-500 font-mono mt-0.5">
-                      {b.arrivalTime} ({b.terminalGate})
                     </div>
                   </td>
 

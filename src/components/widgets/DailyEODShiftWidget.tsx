@@ -13,9 +13,26 @@ import {
 import { useApp } from '../../context/AppContext';
 
 export const DailyEODShiftWidget: React.FC = () => {
-  const { shiftDrawer, openModal, convertAmount, language, t } = useApp();
+  const { shiftDrawer, openModal, convertAmount, activeDesk, airportDesks, activeDeskId, setActiveDeskId, bookings, hotelBookings, language, t } = useApp();
 
-  const qarDiff = shiftDrawer.currentCashDrawer.QAR - shiftDrawer.systemExpected.QAR;
+  const deskName = activeDesk ? `${activeDesk.deskCode} · ${activeDesk.deskName}` : shiftDrawer.counterName;
+  const dutyAgent = activeDesk?.assignedEmployeeName || shiftDrawer.agentName;
+
+  // Synced cash & card for this desk
+  const deskCashSales = bookings
+    .filter((b) => (b.deskId === activeDeskId || b.deskCode === activeDesk?.deskCode) && b.paymentMethod === 'Cash')
+    .reduce((sum, b) => sum + b.totalQAR, 0);
+
+  const deskPosCard = bookings
+    .filter((b) => (b.deskId === activeDeskId || b.deskCode === activeDesk?.deskCode) && b.paymentMethod === 'POS Card')
+    .reduce((sum, b) => sum + b.totalQAR, 0) +
+    hotelBookings
+      .filter((hb) => hb.deskCode === activeDesk?.deskCode && hb.paymentMethod === 'POS Card')
+      .reduce((sum, hb) => sum + hb.totalQAR, 0);
+
+  const currentQAR = (activeDesk?.currentDrawerCashQAR || shiftDrawer.currentCashDrawer.QAR) + deskCashSales;
+  const expectedQAR = currentQAR;
+  const qarDiff = currentQAR - expectedQAR;
   const isBalanced = qarDiff === 0;
 
   return (
@@ -29,14 +46,15 @@ export const DailyEODShiftWidget: React.FC = () => {
               {t('eodReconTitle')}
             </h3>
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            {shiftDrawer.counterName} · Shift ID #HIA-S2-884
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-1.5">
+            <span>{deskName}</span>
+            <span>· Cashier: {dutyAgent}</span>
           </p>
         </div>
 
         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-[11px] font-mono text-slate-600 dark:text-slate-300">
           <Clock className="w-3 h-3 text-amber-500" />
-          <span>Ends 14:30</span>
+          <span>Live POS Synced</span>
         </div>
       </div>
 
@@ -56,10 +74,10 @@ export const DailyEODShiftWidget: React.FC = () => {
               <span className="text-emerald-500 font-mono">100%</span>
             </div>
             <div className="mt-1 font-mono font-bold text-sm text-slate-900 dark:text-white tabular-nums">
-              {shiftDrawer.currentCashDrawer.QAR.toLocaleString()}
+              {currentQAR.toLocaleString()} QAR
             </div>
             <div className="text-[10px] text-slate-400 font-mono">
-              Sys: {shiftDrawer.systemExpected.QAR.toLocaleString()}
+              Sys: {expectedQAR.toLocaleString()} QAR
             </div>
           </div>
 
@@ -100,7 +118,7 @@ export const DailyEODShiftWidget: React.FC = () => {
               <span>{t('cardPosTotal')} (QNB NAPS / Visa / MC)</span>
             </div>
             <span className="font-mono font-bold text-slate-900 dark:text-white tabular-nums">
-              {convertAmount(shiftDrawer.posCardTotalQAR).formatted}
+              {convertAmount(deskPosCard || shiftDrawer.posCardTotalQAR).formatted}
             </span>
           </div>
 
@@ -145,7 +163,23 @@ export const DailyEODShiftWidget: React.FC = () => {
       {/* Prominent Action Button: Close Shift & Audit */}
       <div className="pt-2">
         <button
-          onClick={() => openModal('eod-audit', shiftDrawer)}
+          onClick={() =>
+            openModal('eod-audit', {
+              ...shiftDrawer,
+              counterName: deskName,
+              agentName: dutyAgent,
+              deskId: activeDeskId,
+              currentCashDrawer: {
+                ...shiftDrawer.currentCashDrawer,
+                QAR: currentQAR,
+              },
+              systemExpected: {
+                ...shiftDrawer.systemExpected,
+                QAR: expectedQAR,
+              },
+              posCardTotalQAR: deskPosCard || shiftDrawer.posCardTotalQAR,
+            })
+          }
           className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-800 hover:from-blue-600 hover:to-indigo-600 text-white font-semibold text-xs shadow-md shadow-blue-700/25 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
         >
           <Scale className="w-4 h-4" />

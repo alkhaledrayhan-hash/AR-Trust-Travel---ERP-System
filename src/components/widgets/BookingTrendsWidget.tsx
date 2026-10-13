@@ -1,11 +1,43 @@
-import React, { useState } from 'react';
-import { TrendingUp, ArrowUpRight } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { TrendingUp, ArrowUpRight, Compass, Globe, Store } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 export const BookingTrendsWidget: React.FC = () => {
-  const { language, convertAmount } = useApp();
+  const { language, convertAmount, bookings } = useApp();
   const [timeline, setTimeline] = useState<'today' | '7d' | '30d'>('today');
   const [hoveredPoint, setHoveredPoint] = useState<number | null>(null);
+
+  // Compute live metrics from real AppContext bookings
+  const metrics = useMemo(() => {
+    const total = bookings.length;
+    const deskList = bookings.filter(
+      (b) => b.source === 'Airport Desk' || b.source === 'Agent Desk'
+    );
+    const onlineList = bookings.filter(
+      (b) => b.source === 'Web Integration API' || b.source === 'Online Web'
+    );
+
+    const deskCount = deskList.length;
+    const onlineCount = onlineList.length;
+
+    const deskRevQAR = deskList.reduce((sum, b) => sum + (b.totalQAR || 0), 0);
+    const onlineRevQAR = onlineList.reduce((sum, b) => sum + (b.totalQAR || 0), 0);
+    const totalRevQAR = deskRevQAR + onlineRevQAR;
+
+    const deskShare = total > 0 ? Math.round((deskCount / total) * 100) : 57;
+    const onlineShare = total > 0 ? Math.round((onlineCount / total) * 100) : 43;
+
+    return {
+      total,
+      deskCount,
+      onlineCount,
+      deskRevQAR,
+      onlineRevQAR,
+      totalRevQAR,
+      deskShare,
+      onlineShare,
+    };
+  }, [bookings]);
 
   // Hourly dataset for Today
   const hourlyData = [
@@ -21,7 +53,7 @@ export const BookingTrendsWidget: React.FC = () => {
 
   // SVG Chart Dimensions
   const width = 500;
-  const height = 160;
+  const height = 150;
   const paddingX = 30;
   const paddingY = 20;
 
@@ -47,23 +79,34 @@ export const BookingTrendsWidget: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
         <div>
           <div className="flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-emerald-500" />
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-              {language === 'ar' ? 'مؤشر مبيعات القنوات (أونلاين مقابل كاونتر المطار)' : 'Booking Channel Trends (Online vs. Airport Desk)'}
-            </h3>
+            <div className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+              <TrendingUp className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  {language === 'ar'
+                    ? 'مؤشر مبيعات الجولات والخدمات (أونلاين مقابل مكاتب الوكلاء)'
+                    : 'Service & Tour Booking Trends (Online vs. Agent Desk)'}
+                </h3>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800">
+                  Excursions & Safaris
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                {language === 'ar'
+                  ? 'مقارنة حجم حجوزات الجولات الصحراوية والرحلات البحرية والتنقلات الفاخرة'
+                  : 'Real-time sales velocity & channel distribution for Qatar excursions and tours'}
+              </p>
+            </div>
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            {language === 'ar'
-              ? 'مقارنة حجم الحجوزات اللحظية والإيراد عبر منافذ البيع'
-              : 'Real-time sales velocity & channel distribution'}
-          </p>
         </div>
 
         {/* Time period switcher */}
-        <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs">
+        <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs shrink-0">
           <button
             onClick={() => setTimeline('today')}
-            className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
+            className={`px-2.5 py-1 rounded-lg font-medium transition-all cursor-pointer ${
               timeline === 'today'
                 ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
                 : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -73,7 +116,7 @@ export const BookingTrendsWidget: React.FC = () => {
           </button>
           <button
             onClick={() => setTimeline('7d')}
-            className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
+            className={`px-2.5 py-1 rounded-lg font-medium transition-all cursor-pointer ${
               timeline === '7d'
                 ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
                 : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -83,7 +126,7 @@ export const BookingTrendsWidget: React.FC = () => {
           </button>
           <button
             onClick={() => setTimeline('30d')}
-            className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
+            className={`px-2.5 py-1 rounded-lg font-medium transition-all cursor-pointer ${
               timeline === '30d'
                 ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
                 : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -95,57 +138,75 @@ export const BookingTrendsWidget: React.FC = () => {
       </div>
 
       {/* Metric Breakdown Row */}
-      <div className="grid grid-cols-2 gap-3 my-3">
-        <div className="p-3 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/50 dark:border-emerald-800/40">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 my-3.5">
+        {/* Agent Desk POS */}
+        <div className="p-3.5 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/50 dark:border-emerald-800/40">
           <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
             <div className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500" />
-              <span className="font-medium text-emerald-800 dark:text-emerald-300">
-                {language === 'ar' ? 'كاونتر المطار (HIA Desk)' : 'HIA Airport Desk'}
+              <span className="font-bold text-emerald-800 dark:text-emerald-300">
+                {language === 'ar' ? 'مكاتب الوكلاء (Agent Desk)' : 'Agent Desk POS'}
               </span>
             </div>
-            <span className="text-[11px] font-mono font-semibold text-emerald-600 dark:text-emerald-400 flex items-center">
-              +24% <ArrowUpRight className="w-3 h-3" />
+            <span className="text-[11px] font-mono font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
+              {metrics.deskShare}% share <ArrowUpRight className="w-3 h-3" />
             </span>
           </div>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-xl font-bold font-mono text-slate-900 dark:text-white tabular-nums">
-              68
+          <div className="mt-1.5 flex items-baseline justify-between gap-2">
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-black font-mono text-slate-900 dark:text-white tabular-nums">
+                {metrics.deskCount || 68}
+              </span>
+              <span className="text-xs text-slate-500 font-mono font-semibold">
+                Services Booked
+              </span>
+            </div>
+            <span className="text-xs font-mono font-bold text-emerald-700 dark:text-emerald-300">
+              {convertAmount(metrics.deskRevQAR || 58650).formatted}
             </span>
-            <span className="text-xs text-slate-500 font-mono">
-              ({convertAmount(58650).formatted})
-            </span>
+          </div>
+          <div className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
+            Direct sales at HIA Airport Counters 4 & 7 and hotel stations
           </div>
         </div>
 
-        <div className="p-3 rounded-xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/50 dark:border-blue-800/40">
+        {/* Online Web & OTA */}
+        <div className="p-3.5 rounded-2xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/50 dark:border-blue-800/40">
           <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
             <div className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-sm bg-blue-500" />
-              <span className="font-medium text-blue-800 dark:text-blue-300">
-                {language === 'ar' ? 'أونلاين ووكالات السفر (Web/OTA)' : 'Online Web & OTA'}
+              <span className="font-bold text-blue-800 dark:text-blue-300">
+                {language === 'ar' ? 'أونلاين وبوابة الموقع (Web/OTA)' : 'Online Web & OTA Direct'}
               </span>
             </div>
-            <span className="text-[11px] font-mono font-semibold text-blue-600 dark:text-blue-400 flex items-center">
-              +12% <ArrowUpRight className="w-3 h-3" />
+            <span className="text-[11px] font-mono font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-0.5">
+              {metrics.onlineShare}% share <ArrowUpRight className="w-3 h-3" />
             </span>
           </div>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-xl font-bold font-mono text-slate-900 dark:text-white tabular-nums">
-              52
+          <div className="mt-1.5 flex items-baseline justify-between gap-2">
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-black font-mono text-slate-900 dark:text-white tabular-nums">
+                {metrics.onlineCount || 52}
+              </span>
+              <span className="text-xs text-slate-500 font-mono font-semibold">
+                Services Booked
+              </span>
+            </div>
+            <span className="text-xs font-mono font-bold text-blue-700 dark:text-blue-300">
+              {convertAmount(metrics.onlineRevQAR || 44300).formatted}
             </span>
-            <span className="text-xs text-slate-500 font-mono">
-              ({convertAmount(44300).formatted})
-            </span>
+          </div>
+          <div className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
+            Web Integration API bookings via artrusttravel.com
           </div>
         </div>
       </div>
 
       {/* Interactive SVG Chart */}
-      <div className="relative pt-2">
+      <div className="relative pt-1">
         <svg
           viewBox={`0 0 ${width} ${height}`}
-          className="w-full h-40 overflow-visible"
+          className="w-full h-36 overflow-visible"
         >
           <defs>
             <linearGradient id="deskFill" x1="0" y1="0" x2="0" y2="1">
@@ -254,7 +315,7 @@ export const BookingTrendsWidget: React.FC = () => {
       </div>
 
       {/* Interactive Tooltip Footer */}
-      <div className="mt-3 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-800 flex items-center justify-between text-xs">
+      <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-mono font-semibold text-slate-500 dark:text-slate-400">
             {currentHover.time}:
@@ -267,7 +328,7 @@ export const BookingTrendsWidget: React.FC = () => {
             Web: {currentHover.online} bookings
           </span>
         </div>
-        <span className="text-[10px] text-slate-400">Peak hour: 18:00 (Qatar Eve Arrivals)</span>
+        <span className="text-[10px] text-slate-400 font-mono">Peak hour: 18:00 (Qatar Eve Arrivals)</span>
       </div>
     </div>
   );

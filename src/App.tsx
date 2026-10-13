@@ -4,7 +4,9 @@ import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { DashboardView } from './components/views/DashboardView';
 import { UnifiedBookingsView } from './components/views/UnifiedBookingsView';
-import { AirportDeskPOSView } from './components/views/AirportDeskPOSView';
+import { AgentDeskPOSView } from './components/views/AirportDeskPOSView';
+import { VendorsView } from './components/views/VendorsView';
+import { HotelBookingView } from './components/views/HotelBookingView';
 import { FleetPersonnelView } from './components/views/FleetPersonnelView';
 import { EODShiftView } from './components/views/EODShiftView';
 import { PayrollCommissionView } from './components/views/PayrollCommissionView';
@@ -17,14 +19,22 @@ import { EmployeesView } from './components/views/EmployeesView';
 import { GuestsView } from './components/views/GuestsView';
 import { ExpensesView } from './components/views/ExpensesView';
 import { SettingsView } from './components/views/SettingsView';
+import { UserAccountsManagerView } from './components/views/UserAccountsManagerView';
+import { AuthView } from './components/views/AuthView';
 
 import { NewBookingModal } from './components/modals/NewBookingModal';
 import { QRVoucherModal } from './components/modals/QRVoucherModal';
 import { EODAuditModal } from './components/modals/EODAuditModal';
 import { FlightDetailModal } from './components/modals/FlightDetailModal';
+import { RealtimeNotificationToast } from './components/common/RealtimeNotificationToast';
 
 const MainLayout: React.FC = () => {
-  const { activeTab, activeModal, currentRole } = useApp();
+  const { activeTab, activeModal, currentRole, isAuthenticated } = useApp();
+
+  // If user is not authenticated, render Login/Signup Page
+  if (!isAuthenticated) {
+    return <AuthView />;
+  }
 
   return (
     <div className="min-h-screen flex bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans transition-colors">
@@ -41,9 +51,11 @@ const MainLayout: React.FC = () => {
           <div className="max-w-[1600px] mx-auto">
             {activeTab === 'dashboard' && <DashboardView />}
             {activeTab === 'bookings' && <UnifiedBookingsView />}
+            {activeTab === 'hotel-bookings' && <HotelBookingView />}
+            {activeTab === 'vendors' && <VendorsView />}
+            {activeTab === 'pos' && <AgentDeskPOSView />}
             {activeTab === 'guests' && <GuestsView />}
             {activeTab === 'services' && <ServicesManagementView />}
-            {activeTab === 'pos' && <AirportDeskPOSView />}
             {activeTab === 'employees' && <EmployeesView />}
             {activeTab === 'dispatch' && <FleetPersonnelView />}
             {activeTab === 'eod' && <EODShiftView />}
@@ -53,10 +65,14 @@ const MainLayout: React.FC = () => {
             {activeTab === 'reports' && <FinancialReportsView />}
             {activeTab === 'audit-logs' && <AuditLogsView />}
             {activeTab === 'driver-portal' && <DriverPortalView />}
+            {activeTab === 'accounts' && <UserAccountsManagerView />}
             {activeTab === 'settings' && <SettingsView />}
           </div>
         </main>
       </div>
+
+      {/* Real-time live notification toast */}
+      <RealtimeNotificationToast />
 
       {/* 3. Conditional Interactive Modals */}
       {activeModal === 'new-booking' && <NewBookingModal />}
